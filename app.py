@@ -130,6 +130,11 @@ class LoginDialog(QDialog):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
+        ver_label = QLabel(f"版本 v{__version__}")
+        ver_label.setAlignment(Qt.AlignCenter)
+        ver_label.setStyleSheet("color:#868e96;")
+        layout.addWidget(ver_label)
+
         form = QFormLayout()
         self.user_edit = QLineEdit(cfg.get("username", ""))
         self.user_edit.setPlaceholderText("帳號（email）")
