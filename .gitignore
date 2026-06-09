@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# 本機機密與設定（絕不進版控）
+update_config.json
+config.json
+.update_token
+
+# 打包產物
+build/
+dist/
+*.spec
+
+# 系統
+.DS_Store
+
+# 本機工具設定
+.claude/

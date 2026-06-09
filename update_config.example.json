@@ -1,0 +1,6 @@
+{
+  "owner": "你的GitHub帳號",
+  "repo": "studioa-reservation-manager",
+  "branch": "main",
+  "token": "github_pat_在這裡貼上_唯讀_權杖"
+}
