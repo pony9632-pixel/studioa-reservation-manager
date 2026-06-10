@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QGridLayout, QFormLayout, QLabel, QLineEdit, QPushButton, QCheckBox,
     QComboBox, QDateEdit, QTableWidget, QTableWidgetItem, QTabWidget,
     QMessageBox, QFrame, QHeaderView, QAbstractItemView, QGroupBox, QSizePolicy,
+    QButtonGroup,
 )
 
 import client
@@ -507,12 +508,56 @@ def pickup_deadline(it: dict) -> str:
 
 
 PICKUP_DEADLINE_KEY = "_pickupDeadline"
+ACTIVITY_COL_KEY = "_activity"
+
+# 「活動名稱」在單筆資料裡的欄位名稱未在 api_notes 明確記載，
+# 這裡列出最可能的鍵名，載入資料時自動偵測（偵測不到就停用活動篩選）。
+ACTIVITY_KEY_CANDIDATES = [
+    "reservationActivityName", "reservationActivityTitle", "reservationName",
+    "activityName", "activityTitle", "reservationActivity", "campaignName",
+]
+
+
+def detect_activity_key(items: list[dict]) -> Optional[str]:
+    """從實際資料中找出存放「活動名稱」的欄位；找不到回傳 None。"""
+    keys: set[str] = set()
+    for it in items[:50]:
+        if isinstance(it, dict):
+            keys.update(it.keys())
+    for cand in ACTIVITY_KEY_CANDIDATES:
+        if cand in keys:
+            return cand
+    for k in keys:  # 退而求其次：任何同時含 activity 與 name/title 的鍵
+        lk = k.lower()
+        if "activity" in lk and ("name" in lk or "title" in lk):
+            return k
+    return None
+
+
+# 產品大分類：由型號字串（productName）關鍵字判斷
+PRODUCT_CATEGORIES = ["Mac", "iPhone", "iPad", "AirPods"]
+
+
+def product_category(product_name: Optional[str]) -> str:
+    """把型號歸到 Mac / iPhone / iPad / AirPods，其餘為「其他」。"""
+    s = (product_name or "").lower()
+    if "airpods" in s:
+        return "AirPods"
+    if "ipad" in s:
+        return "iPad"
+    if "iphone" in s:
+        return "iPhone"
+    if "mac" in s:  # MacBook / iMac / Mac mini / Mac Studio / Mac Pro
+        return "Mac"
+    return "其他"
+
 
 COLUMNS = [
     ("orderSNo", "預約單號"),
     ("statusName", "狀態"),
     (PICKUP_DEADLINE_KEY, "預計取機時間(已到貨/保留)"),
     ("productName", "型號"),
+    (ACTIVITY_COL_KEY, "活動名稱"),
     ("userClassName", "會員等級"),
     ("vipId", "會員代碼"),
     ("subscriberName", "姓名"),
@@ -528,6 +573,10 @@ class StatusTab(QWidget):
         self.api = api
         self.mw = mw
         self.rows_items: list[dict] = []
+        self._all_items: list[dict] = []
+        self._cat: str = "全部"
+        self._activity_key: Optional[str] = None
+        self._cat_buttons: dict[str, QPushButton] = {}
         root = QVBoxLayout(self)
 
         # 查詢列 1：依「預約單號」或「電話」查詢
@@ -561,6 +610,54 @@ class StatusTab(QWidget):
         bar2.addWidget(self.query_btn)
         bar2.addStretch()
         root.addLayout(bar2)
+
+        # 漏斗篩選（篩目前載入的清單）
+        filt = QGroupBox("篩選（縮小目前載入的清單）")
+        filt.setStyleSheet("QPushButton:checked{background:#1f6feb;color:white;}")
+        fv = QVBoxLayout(filt)
+
+        # 第一層：產品大分類（一排按鈕，單選）
+        rowA = QHBoxLayout()
+        rowA.addWidget(QLabel("大分類："))
+        self.cat_group = QButtonGroup(self)
+        self.cat_group.setExclusive(True)
+        for name in ["全部"] + PRODUCT_CATEGORIES + ["其他"]:
+            b = QPushButton(name)
+            b.setCheckable(True)
+            if name == "全部":
+                b.setChecked(True)
+            self.cat_group.addButton(b)
+            self._cat_buttons[name] = b
+            rowA.addWidget(b)
+        self.cat_group.buttonClicked.connect(self._on_cat_clicked)
+        rowA.addStretch()
+        fv.addLayout(rowA)
+
+        # 第二層：活動 / 會員等級 / 狀態（下拉）＋ 符合筆數
+        rowB = QHBoxLayout()
+        rowB.addWidget(QLabel("活動："))
+        self.f_activity = QComboBox()
+        self.f_activity.addItem("全部活動", None)
+        self.f_activity.setMinimumWidth(160)
+        self.f_activity.currentIndexChanged.connect(self._apply_filters)
+        rowB.addWidget(self.f_activity)
+        rowB.addWidget(QLabel("會員等級："))
+        self.f_level = QComboBox()
+        self.f_level.addItem("全部等級", None)
+        self.f_level.currentIndexChanged.connect(self._apply_filters)
+        rowB.addWidget(self.f_level)
+        rowB.addWidget(QLabel("狀態："))
+        self.f_status = QComboBox()
+        self.f_status.addItem("全部狀態", None)
+        self.f_status.currentIndexChanged.connect(self._apply_filters)
+        rowB.addWidget(self.f_status)
+        rowB.addStretch()
+        self.count_label = QLabel("—")
+        self.count_label.setStyleSheet("color:#1f6feb;font-weight:bold;")
+        rowB.addWidget(self.count_label)
+        fv.addLayout(rowB)
+
+        root.addWidget(filt)
 
         # 結果表
         self.table = QTableWidget()
@@ -626,22 +723,89 @@ class StatusTab(QWidget):
     def _on_rows(self, items):
         self.search_btn.setEnabled(True); self.search_btn.setText("查詢")
         self.query_btn.setEnabled(True); self.query_btn.setText("查詢")
-        self.rows_items = items
+        self._all_items = items
+        self._populate_filter_options(items)
+        self._apply_filters()
+        if not items:
+            self.mw.status("查無資料。")
+        else:
+            self.mw.status(f"找到 {len(items)} 筆（可用下方篩選縮小）。")
+
+    # ---- 漏斗篩選 ---- #
+    def _on_cat_clicked(self, button):
+        self._cat = button.text()
+        self._apply_filters()
+
+    def _populate_filter_options(self, items):
+        self._activity_key = detect_activity_key(items)
+
+        def fill(combo, all_label, values):
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem(all_label, None)
+            for v in values:
+                combo.addItem(str(v), v)
+            combo.setCurrentIndex(0)
+            combo.blockSignals(False)
+
+        if self._activity_key:
+            acts = sorted({it.get(self._activity_key) for it in items if it.get(self._activity_key)})
+            self.f_activity.setEnabled(True)
+            self.f_activity.setToolTip("")
+            fill(self.f_activity, "全部活動", acts)
+        else:
+            self.f_activity.setEnabled(False)
+            self.f_activity.setToolTip("這批資料裡找不到活動名稱欄位")
+            fill(self.f_activity, "（無活動欄位）", [])
+
+        levels = sorted({it.get("userClassName") for it in items if it.get("userClassName")})
+        fill(self.f_level, "全部等級", levels)
+        statuses = sorted({it.get("statusName") for it in items if it.get("statusName")})
+        fill(self.f_status, "全部狀態", statuses)
+
+        self._cat = "全部"
+        btn = self._cat_buttons.get("全部")
+        if btn:
+            self.cat_group.blockSignals(True)
+            btn.setChecked(True)
+            self.cat_group.blockSignals(False)
+
+    def _apply_filters(self):
+        cat = self._cat
+        act = self.f_activity.currentData()
+        lvl = self.f_level.currentData()
+        sta = self.f_status.currentData()
+        out = []
+        for it in self._all_items:
+            if cat and cat != "全部" and product_category(it.get("productName")) != cat:
+                continue
+            if act is not None:
+                v = it.get(self._activity_key) if self._activity_key else None
+                if v != act:
+                    continue
+            if lvl is not None and it.get("userClassName") != lvl:
+                continue
+            if sta is not None and it.get("statusName") != sta:
+                continue
+            out.append(it)
+        self.rows_items = out
+        self._render_rows(out)
+        self.count_label.setText(f"符合 {len(out)} / 共 {len(self._all_items)} 筆")
+
+    def _render_rows(self, items):
         self.table.setSortingEnabled(False)
         self.table.setRowCount(len(items))
         for r, it in enumerate(items):
             for c, (key, _title) in enumerate(COLUMNS):
                 if key == PICKUP_DEADLINE_KEY:
                     val = pickup_deadline(it)
+                elif key == ACTIVITY_COL_KEY:
+                    val = it.get(self._activity_key) if self._activity_key else None
                 else:
                     val = it.get(key)
                 self.table.setItem(r, c, QTableWidgetItem("" if val is None else str(val)))
         self.table.setSortingEnabled(True)
         self.table.resizeColumnsToContents()
-        if not items:
-            self.mw.status("查無資料。")
-        else:
-            self.mw.status(f"找到 {len(items)} 筆。")
 
     def _on_fail(self, err):
         self.search_btn.setEnabled(True); self.search_btn.setText("查詢")
