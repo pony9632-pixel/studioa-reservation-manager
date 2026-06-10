@@ -31,13 +31,12 @@ echo "✅ Python：$(python3 --version)"
 # 2) 複製程式到應用資料夾 ---------------------------------------------
 echo "→ 複製程式到 $APP_DIR"
 mkdir -p "$APP_DIR"
-for f in app.py client.py updater.py version.py requirements.txt README.md update_config.json; do
+# 複製所有程式檔（*.py，含 labels.py 等未來新增的模組）與必要檔
+cp -f "$SRC"/*.py "$APP_DIR"/ 2>/dev/null || true
+for f in requirements.txt README.md api_notes.md update_config.json; do
   [ -f "$SRC/$f" ] && cp -f "$SRC/$f" "$APP_DIR/"
 done
-
-if [ ! -f "$APP_DIR/update_config.json" ]; then
-  echo "   （注意：未發現 update_config.json，將無法自動更新，但仍可正常使用。）"
-fi
+echo "   （自動更新已內建、免設定：每次開啟會自動檢查並更新到最新版。）"
 
 # 3) 建立虛擬環境並安裝套件 -------------------------------------------
 echo "→ 建立虛擬環境並安裝套件（第一次約需 1–3 分鐘，請稍候）…"
