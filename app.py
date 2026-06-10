@@ -30,10 +30,12 @@ from PySide6.QtWidgets import (
     QGridLayout, QFormLayout, QLabel, QLineEdit, QPushButton, QCheckBox,
     QComboBox, QDateEdit, QTableWidget, QTableWidgetItem, QTabWidget,
     QMessageBox, QFrame, QHeaderView, QAbstractItemView, QGroupBox, QSizePolicy,
-    QButtonGroup, QInputDialog,
+    QButtonGroup, QInputDialog, QProgressBar, QListWidget, QListWidgetItem,
+    QStackedWidget,
 )
 
 import changelog
+import theme
 import client
 from client import StudioAClient, StudioAError, STATUS_CODE_TO_NAME
 from version import __version__
@@ -194,19 +196,24 @@ class LoginDialog(QDialog):
 # ====================================================================== #
 # 共用小工具
 # ====================================================================== #
-def make_card(title: str, highlight: bool = False) -> tuple[QFrame, QLabel]:
-    """回傳 (卡片框, 數值Label)。"""
+def make_card(title: str, icon: str = "", accent: str = "#2f6bf0",
+              highlight: bool = False) -> tuple[QFrame, QLabel]:
+    """回傳 (卡片框, 數值Label)。含左上小圖示方塊。"""
     frame = QFrame()
-    frame.setFrameShape(QFrame.StyledPanel)
-    bg = "#1f6feb" if highlight else "#f1f3f5"
-    fg = "#ffffff" if highlight else "#212529"
-    sub = "#dbe9ff" if highlight else "#868e96"
-    frame.setStyleSheet(
-        f"QFrame{{background:{bg};border-radius:10px;}}"
-        f"QLabel{{background:transparent;}}"
-    )
+    if highlight:
+        frame.setStyleSheet("QFrame{background:#2f6bf0;border-radius:14px;}QLabel{background:transparent;}")
+        fg, sub, icon_bg, icon_fg = "#ffffff", "#dbe9ff", "rgba(255,255,255,0.20)", "#ffffff"
+    else:
+        frame.setStyleSheet("QFrame{background:#ffffff;border:1px solid #e9edf4;border-radius:14px;}QLabel{background:transparent;}")
+        fg, sub, icon_bg, icon_fg = "#20283a", "#79839a", "#eef2fb", accent
     v = QVBoxLayout(frame)
-    v.setContentsMargins(14, 10, 14, 10)
+    v.setContentsMargins(16, 14, 16, 14)
+    v.setSpacing(6)
+    ic = QLabel(icon)
+    ic.setFixedSize(32, 32)
+    ic.setAlignment(Qt.AlignCenter)
+    ic.setStyleSheet(f"background:{icon_bg};color:{icon_fg};border-radius:9px;font-size:15px;")
+    v.addWidget(ic)
     t = QLabel(title); t.setStyleSheet(f"color:{sub};font-size:13px;")
     val = QLabel("—")
     val.setStyleSheet(f"color:{fg};font-size:26px;font-weight:bold;")
@@ -224,22 +231,34 @@ def qdate_to_end(d: QDate) -> dt.datetime:
 
 
 def fill_count_table(table: QTableWidget, counter: collections.Counter, col_title: str):
+    """填排行榜：名次＋名稱、藍色長條、數量（依數量由多到少）。"""
     rows = counter.most_common()
-    table.setSortingEnabled(False)  # 填表時先關排序，避免邊填邊排導致錯位
+    maxc = max((c for _, c in rows), default=1) or 1
+    table.setSortingEnabled(False)  # 排行榜固定依數量排序，不開使用者排序
     table.clear()
-    table.setColumnCount(2)
-    table.setHorizontalHeaderLabels([col_title, "數量"])
+    table.setColumnCount(3)
+    table.setHorizontalHeaderLabels([col_title, "", "數量"])
     table.setRowCount(len(rows))
+    table.verticalHeader().setVisible(False)
     for i, (name, cnt) in enumerate(rows):
-        item_name = QTableWidgetItem(str(name) if name else "（無）")
+        item_name = QTableWidgetItem(f"  {i + 1}.  {name if name else '（無）'}")
+        table.setItem(i, 0, item_name)
+        bar = QProgressBar()
+        bar.setObjectName("statbar")
+        bar.setRange(0, 100)
+        bar.setValue(int(cnt / maxc * 100))
+        bar.setTextVisible(False)
+        bar.setFixedHeight(8)
+        table.setCellWidget(i, 1, bar)
         item_cnt = QTableWidgetItem()
         item_cnt.setData(Qt.DisplayRole, int(cnt))
         item_cnt.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        table.setItem(i, 0, item_name)
-        table.setItem(i, 1, item_cnt)
-    table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-    table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-    table.setSortingEnabled(True)
+        table.setItem(i, 2, item_cnt)
+    hh = table.horizontalHeader()
+    hh.setSectionResizeMode(0, QHeaderView.Stretch)
+    hh.setSectionResizeMode(1, QHeaderView.Fixed)
+    table.setColumnWidth(1, 120)
+    hh.setSectionResizeMode(2, QHeaderView.ResizeToContents)
 
 
 # ====================================================================== #
@@ -272,15 +291,15 @@ class OverviewTab(QWidget):
 
         # 統計卡片
         cards = QGridLayout()
-        self.card_total = make_card("總數量")
-        self.card_reserved = make_card("目前剩餘已預約", highlight=True)
-        self.card_alloc = make_card("已配貨")
-        self.card_arrival = make_card("已到貨")
-        self.card_hold = make_card("保留")
-        self.card_pick = make_card("已取貨")
-        self.card_abandon = make_card("放棄")
-        self.card_cancel = make_card("取消")
-        self.card_rate = make_card("取貨率")
+        self.card_total = make_card("總數量", "📊", "#2f6bf0")
+        self.card_reserved = make_card("目前剩餘已預約", "📦", "#2f6bf0", highlight=True)
+        self.card_alloc = make_card("已配貨", "🚚", "#6a8cff")
+        self.card_arrival = make_card("已到貨", "✅", "#1d9e75")
+        self.card_hold = make_card("保留", "⏳", "#d98324")
+        self.card_pick = make_card("已取貨", "🛍️", "#1d9e75")
+        self.card_abandon = make_card("放棄", "🚫", "#d6453d")
+        self.card_cancel = make_card("取消", "❌", "#d6453d")
+        self.card_rate = make_card("取貨率", "📈", "#2f6bf0")
         cards_list = [
             self.card_reserved, self.card_total, self.card_alloc, self.card_arrival,
             self.card_hold, self.card_pick, self.card_abandon, self.card_cancel, self.card_rate,
@@ -610,24 +629,8 @@ class StatusTab(QWidget):
         root.addLayout(bar)
         self._update_placeholder()
 
-        # 查詢列 2：依狀態查詢（可複選；不需指定日期，自動涵蓋全部）
-        bar2 = QHBoxLayout()
-        bar2.addWidget(QLabel("或依狀態查詢（可複選）："))
-        self._status_checks: dict[int, QCheckBox] = {}
-        for code in CHANGE_STATUS_OPTIONS:
-            cb = QCheckBox(STATUS_CODE_TO_NAME[code])
-            if code in (5, 6):  # 預設勾「已到貨」「保留」（最常用）
-                cb.setChecked(True)
-            self._status_checks[code] = cb
-            bar2.addWidget(cb)
-        self.query_btn = QPushButton("查詢")
-        self.query_btn.clicked.connect(self.query_by_status)
-        bar2.addWidget(self.query_btn)
-        bar2.addStretch()
-        root.addLayout(bar2)
-
-        # 漏斗篩選（篩目前載入的清單）
-        filt = QGroupBox("篩選（縮小目前載入的清單）")
+        # 篩選（由上而下：大分類 → 活動／梯次／會員等級 → 狀態＋查詢）
+        filt = QGroupBox("篩選（由上而下：大分類 → 活動／梯次／會員等級 → 狀態）")
         filt.setStyleSheet("QPushButton:checked{background:#1f6feb;color:white;}")
         fv = QVBoxLayout(filt)
 
@@ -667,16 +670,28 @@ class StatusTab(QWidget):
         self.f_level.addItem("全部等級", None)
         self.f_level.currentIndexChanged.connect(self._apply_filters)
         rowB.addWidget(self.f_level)
-        rowB.addWidget(QLabel("狀態："))
-        self.f_status = QComboBox()
-        self.f_status.addItem("全部狀態", None)
-        self.f_status.currentIndexChanged.connect(self._apply_filters)
-        rowB.addWidget(self.f_status)
         rowB.addStretch()
+        fv.addLayout(rowB)
+
+        # ③ 狀態（可複選）＋ 查詢（這排會去後台載入；上面條件查詢後仍保留並套用）
+        rowC = QHBoxLayout()
+        rowC.addWidget(QLabel("狀態（可複選）："))
+        self._status_checks: dict[int, QCheckBox] = {}
+        for code in CHANGE_STATUS_OPTIONS:
+            cb = QCheckBox(STATUS_CODE_TO_NAME[code])
+            if code in (5, 6):  # 預設勾「已到貨」「保留」（最常用）
+                cb.setChecked(True)
+            self._status_checks[code] = cb
+            rowC.addWidget(cb)
+        self.query_btn = QPushButton("查詢")
+        self.query_btn.setStyleSheet("font-weight:bold;")
+        self.query_btn.clicked.connect(self.query_by_status)
+        rowC.addWidget(self.query_btn)
+        rowC.addStretch()
         self.count_label = QLabel("—")
         self.count_label.setStyleSheet("color:#1f6feb;font-weight:bold;")
-        rowB.addWidget(self.count_label)
-        fv.addLayout(rowB)
+        rowC.addWidget(self.count_label)
+        fv.addLayout(rowC)
 
         root.addWidget(filt)
 
@@ -810,12 +825,14 @@ class StatusTab(QWidget):
 
     def _populate_filter_options(self, items):
         def fill(combo, all_label, values):
+            prev = combo.currentData()  # 保留目前選擇（換批資料後若仍存在則還原）
             combo.blockSignals(True)
             combo.clear()
             combo.addItem(all_label, None)
             for v in values:
                 combo.addItem(str(v), v)
-            combo.setCurrentIndex(0)
+            idx = combo.findData(prev) if prev is not None else 0
+            combo.setCurrentIndex(idx if idx >= 0 else 0)
             combo.blockSignals(False)
 
         # 活動：用本批資料出現過的 reservationActivityId，名稱來自活動清單 API
@@ -826,12 +843,14 @@ class StatusTab(QWidget):
                 seen.add(aid)
                 act_ids.append(aid)
         act_ids.sort(key=self._activity_label)
+        prev_act = self.f_activity.currentData()
         self.f_activity.blockSignals(True)
         self.f_activity.clear()
         self.f_activity.addItem("全部活動", None)
         for aid in act_ids:
             self.f_activity.addItem(self._activity_label(aid), aid)
-        self.f_activity.setCurrentIndex(0)
+        a_idx = self.f_activity.findData(prev_act) if prev_act is not None else 0
+        self.f_activity.setCurrentIndex(a_idx if a_idx >= 0 else 0)
         self.f_activity.setEnabled(bool(act_ids))
         self.f_activity.blockSignals(False)
 
@@ -839,22 +858,13 @@ class StatusTab(QWidget):
         fill(self.f_batch, "全部梯次", batches)
         levels = sorted({it.get("userClassName") for it in items if it.get("userClassName")})
         fill(self.f_level, "全部等級", levels)
-        statuses = sorted({it.get("statusName") for it in items if it.get("statusName")})
-        fill(self.f_status, "全部狀態", statuses)
-
-        self._cat = "全部"
-        btn = self._cat_buttons.get("全部")
-        if btn:
-            self.cat_group.blockSignals(True)
-            btn.setChecked(True)
-            self.cat_group.blockSignals(False)
+        # 大分類維持目前選擇（不重置回「全部」），讓「先設大分類再查詢」也有效
 
     def _apply_filters(self):
         cat = self._cat
         act = self.f_activity.currentData()
         bat = self.f_batch.currentData()
         lvl = self.f_level.currentData()
-        sta = self.f_status.currentData()
         out = []
         for it in self._all_items:
             if cat and cat != "全部" and product_category(it.get("productName")) != cat:
@@ -864,8 +874,6 @@ class StatusTab(QWidget):
             if bat is not None and it.get("batchNo") != bat:
                 continue
             if lvl is not None and it.get("userClassName") != lvl:
-                continue
-            if sta is not None and it.get("statusName") != sta:
                 continue
             out.append(it)
         self.rows_items = out
@@ -1118,16 +1126,89 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"StudioA 門市預約管理 v{__version__} — {api.shop_name or ''}")
         self.resize(1150, 760)
 
-        tabs = QTabWidget()
+        # 側欄 + 內容（取代原本上方分頁）
+        central = QWidget()
+        h = QHBoxLayout(central)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(0)
+
+        sidebar = QWidget()
+        sidebar.setObjectName("sidebar")
+        sidebar.setFixedWidth(212)
+        sv = QVBoxLayout(sidebar)
+        sv.setContentsMargins(0, 0, 0, 0)
+        sv.setSpacing(0)
+
+        logo = QWidget()
+        lv = QHBoxLayout(logo)
+        lv.setContentsMargins(18, 18, 14, 10)
+        badge = QLabel("A")
+        badge.setFixedSize(34, 34)
+        badge.setAlignment(Qt.AlignCenter)
+        badge.setStyleSheet("background:#2f6bf0;color:#fff;border-radius:9px;font-size:16px;font-weight:bold;")
+        lv.addWidget(badge)
+        tbox = QVBoxLayout()
+        tbox.setSpacing(0)
+        lt1 = QLabel("StudioA")
+        lt1.setStyleSheet("color:#fff;font-size:15px;font-weight:bold;")
+        lt2 = QLabel("門市預約管理")
+        lt2.setStyleSheet("color:#9aa3b5;font-size:11px;")
+        tbox.addWidget(lt1)
+        tbox.addWidget(lt2)
+        lv.addLayout(tbox)
+        lv.addStretch()
+        sv.addWidget(logo)
+
+        sec = QLabel("主功能")
+        sec.setStyleSheet("color:#5e6b8e;font-size:11px;padding:10px 22px 4px;")
+        sv.addWidget(sec)
+
+        self.nav = QListWidget()
+        self.nav.setObjectName("nav")
+        for name in ["預約總覽", "區間查詢", "狀態管理", "變更紀錄"]:
+            QListWidgetItem(name, self.nav)
+        sv.addWidget(self.nav, 1)
+
+        foot = QWidget()
+        fv = QHBoxLayout(foot)
+        fv.setContentsMargins(16, 12, 16, 16)
+        avatar = QLabel((api.shop_name or "店")[:1])
+        avatar.setFixedSize(32, 32)
+        avatar.setAlignment(Qt.AlignCenter)
+        avatar.setStyleSheet("background:#34405a;color:#fff;border-radius:8px;font-weight:bold;")
+        fv.addWidget(avatar)
+        ubox = QVBoxLayout()
+        ubox.setSpacing(0)
+        un = QLabel(api.shop_name or "")
+        un.setStyleSheet("color:#fff;font-size:12px;font-weight:bold;")
+        us = QLabel(api.user_name or "")
+        us.setStyleSheet("color:#9aa3b5;font-size:11px;")
+        ubox.addWidget(un)
+        ubox.addWidget(us)
+        fv.addLayout(ubox)
+        fv.addStretch()
+        sv.addWidget(foot)
+
+        self.stack = QStackedWidget()
         self.overview = OverviewTab(api, self)
         self.range = RangeTab(api, self)
         self.status_tab = StatusTab(api, self)
         self.changelog_tab = ChangeLogTab(self)
-        tabs.addTab(self.overview, "預約總覽")
-        tabs.addTab(self.range, "區間查詢")
-        tabs.addTab(self.status_tab, "狀態管理")
-        tabs.addTab(self.changelog_tab, "變更紀錄")
-        self.setCentralWidget(tabs)
+        for w in (self.overview, self.range, self.status_tab, self.changelog_tab):
+            self.stack.addWidget(w)
+
+        content = QWidget()
+        content.setObjectName("contentArea")
+        cv = QVBoxLayout(content)
+        cv.setContentsMargins(16, 16, 16, 16)
+        cv.addWidget(self.stack)
+
+        h.addWidget(sidebar)
+        h.addWidget(content, 1)
+        self.setCentralWidget(central)
+
+        self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
+        self.nav.setCurrentRow(0)
 
         self.statusBar().showMessage(f"已登入：{api.shop_name}（{api.user_name}）")
 
@@ -1176,6 +1257,7 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("StudioA 預約管理")
+    theme.apply_theme(app)
 
     api = StudioAClient()
     login = LoginDialog(api)
