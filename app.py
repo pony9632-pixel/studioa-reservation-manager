@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QButtonGroup, QInputDialog,
 )
 
+import changelog
 import client
 from client import StudioAClient, StudioAError, STATUS_CODE_TO_NAME
 from version import __version__
@@ -328,6 +329,7 @@ class OverviewTab(QWidget):
         def ok(result):
             stats, items = result
             self.items = items
+            changelog.record(items)
             self._update_cards(stats)
             self.recompute_tables()
             self.refresh_btn.setEnabled(True)
@@ -448,6 +450,7 @@ class RangeTab(QWidget):
 
         def ok(result):
             stats, items = result
+            changelog.record(items)
             total = stats.get("totalCount", len(items))
             self.big.setText(f"{total} 筆")
             self.sub.setText(f"{start:%Y-%m-%d} ～ {end:%Y-%m-%d} 之間新增的預約")
@@ -539,7 +542,7 @@ COLUMNS = [
     ("subscriberContactNumber", "電話"),
     (PICKUP_DEADLINE_KEY, "預計取機時間(已到貨/保留)"),
     ("productName", "型號"),
-    (ACTIVITY_COL_KEY, "活動名稱"),
+    ("batchNo", "梯次"),
     ("userClassName", "會員等級"),
     ("vipId", "會員代碼"),
     ("reservationTimeValue", "預約時間"),
@@ -607,15 +610,16 @@ class StatusTab(QWidget):
         root.addLayout(bar)
         self._update_placeholder()
 
-        # 查詢列 2：依狀態查詢（不需指定日期，自動涵蓋全部）
+        # 查詢列 2：依狀態查詢（可複選；不需指定日期，自動涵蓋全部）
         bar2 = QHBoxLayout()
-        bar2.addWidget(QLabel("或依狀態查詢："))
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("全部狀態", None)
+        bar2.addWidget(QLabel("或依狀態查詢（可複選）："))
+        self._status_checks: dict[int, QCheckBox] = {}
         for code in CHANGE_STATUS_OPTIONS:
-            self.status_filter.addItem(STATUS_CODE_TO_NAME[code], code)
-        self.status_filter.setCurrentIndex(1)  # 預設「已預約」
-        bar2.addWidget(self.status_filter)
+            cb = QCheckBox(STATUS_CODE_TO_NAME[code])
+            if code in (5, 6):  # 預設勾「已到貨」「保留」（最常用）
+                cb.setChecked(True)
+            self._status_checks[code] = cb
+            bar2.addWidget(cb)
         self.query_btn = QPushButton("查詢")
         self.query_btn.clicked.connect(self.query_by_status)
         bar2.addWidget(self.query_btn)
@@ -652,6 +656,12 @@ class StatusTab(QWidget):
         self.f_activity.setMinimumWidth(160)
         self.f_activity.currentIndexChanged.connect(self._apply_filters)
         rowB.addWidget(self.f_activity)
+        rowB.addWidget(QLabel("梯次："))
+        self.f_batch = QComboBox()
+        self.f_batch.addItem("全部梯次", None)
+        self.f_batch.setMinimumWidth(130)
+        self.f_batch.currentIndexChanged.connect(self._apply_filters)
+        rowB.addWidget(self.f_batch)
         rowB.addWidget(QLabel("會員等級："))
         self.f_level = QComboBox()
         self.f_level.addItem("全部等級", None)
@@ -670,18 +680,26 @@ class StatusTab(QWidget):
 
         root.addWidget(filt)
 
-        # 結果表
+        # 結果表（第 0 欄為勾選框）
         self.table = QTableWidget()
-        self.table.setColumnCount(len(COLUMNS))
-        self.table.setHorizontalHeaderLabels([c[1] for c in COLUMNS])
+        self.table.setColumnCount(len(COLUMNS) + 1)
+        self.table.setHorizontalHeaderLabels(["✓"] + [c[1] for c in COLUMNS])
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         root.addWidget(self.table, 1)
 
         # 改狀態列
         change = QHBoxLayout()
+        self.check_all_btn = QPushButton("全選")
+        self.check_all_btn.clicked.connect(lambda: self._set_all_checks(True))
+        self.uncheck_all_btn = QPushButton("全不選")
+        self.uncheck_all_btn.clicked.connect(lambda: self._set_all_checks(False))
+        change.addWidget(self.check_all_btn)
+        change.addWidget(self.uncheck_all_btn)
+        change.addSpacing(16)
         change.addWidget(QLabel("將選取的單據改為："))
         self.new_status = QComboBox()
         for code in CHANGE_STATUS_OPTIONS:
@@ -697,7 +715,7 @@ class StatusTab(QWidget):
         self.print_btn.clicked.connect(self.print_labels)
         change.addWidget(self.print_btn)
         change.addStretch()
-        self.hint = QLabel("提示：門市標準可改「已到貨/保留/已取貨」；其他狀態若後台不允許會顯示錯誤訊息。")
+        self.hint = QLabel("提示：在表格最左欄「✓」勾選要處理的單據（可多選），再按送出變更或列印標籤。門市標準可改「已到貨/保留/已取貨」。")
         self.hint.setStyleSheet("color:#868e96;")
         root.addWidget(self.hint)
         root.addLayout(change)
@@ -727,21 +745,32 @@ class StatusTab(QWidget):
         run_async(self, fn, self._on_rows, self._on_fail)
 
     def query_by_status(self):
-        status = self.status_filter.currentData()
+        codes = [code for code, cb in self._status_checks.items() if cb.isChecked()]
         start = dt.datetime(2000, 1, 1)
         end = dt.datetime.now() + dt.timedelta(days=3650)
         self.query_btn.setEnabled(False); self.query_btn.setText("查詢中…")
-        self.mw.status("依狀態查詢中…")
-        run_async(
-            self,
-            lambda: self.api.fetch_all_items(start, end, status=status)[1],
-            self._on_rows, self._on_fail,
-        )
+        names = "、".join(STATUS_CODE_TO_NAME[c] for c in codes) if codes else "全部狀態"
+        self.mw.status(f"依狀態查詢（{names}）中…")
+
+        def task():
+            if not codes:  # 沒勾選 = 查全部狀態
+                return self.api.fetch_all_items(start, end)[1]
+            merged, seen = [], set()
+            for code in codes:  # 各狀態分別查再合併
+                for it in self.api.fetch_all_items(start, end, status=code)[1]:
+                    key = it.get("productOrderProductShelfId") or it.get("orderSNo") or id(it)
+                    if key not in seen:
+                        seen.add(key)
+                        merged.append(it)
+            return merged
+
+        run_async(self, task, self._on_rows, self._on_fail)
 
     def _on_rows(self, items):
         self.search_btn.setEnabled(True); self.search_btn.setText("查詢")
         self.query_btn.setEnabled(True); self.query_btn.setText("查詢")
         self._all_items = items
+        changelog.record(items)
         self._populate_filter_options(items)
         self._apply_filters()
         if not items:
@@ -806,6 +835,8 @@ class StatusTab(QWidget):
         self.f_activity.setEnabled(bool(act_ids))
         self.f_activity.blockSignals(False)
 
+        batches = sorted({it.get("batchNo") for it in items if it.get("batchNo")})
+        fill(self.f_batch, "全部梯次", batches)
         levels = sorted({it.get("userClassName") for it in items if it.get("userClassName")})
         fill(self.f_level, "全部等級", levels)
         statuses = sorted({it.get("statusName") for it in items if it.get("statusName")})
@@ -821,6 +852,7 @@ class StatusTab(QWidget):
     def _apply_filters(self):
         cat = self._cat
         act = self.f_activity.currentData()
+        bat = self.f_batch.currentData()
         lvl = self.f_level.currentData()
         sta = self.f_status.currentData()
         out = []
@@ -828,6 +860,8 @@ class StatusTab(QWidget):
             if cat and cat != "全部" and product_category(it.get("productName")) != cat:
                 continue
             if act is not None and it.get(ACTIVITY_ID_KEY) != act:
+                continue
+            if bat is not None and it.get("batchNo") != bat:
                 continue
             if lvl is not None and it.get("userClassName") != lvl:
                 continue
@@ -842,14 +876,18 @@ class StatusTab(QWidget):
         self.table.setSortingEnabled(False)
         self.table.setRowCount(len(items))
         for r, it in enumerate(items):
+            chk = QTableWidgetItem()
+            chk.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            chk.setCheckState(Qt.Unchecked)
+            chk.setData(Qt.UserRole, r)  # 對應 rows_items 的索引（排序後仍正確）
+            chk.setTextAlignment(Qt.AlignCenter)
+            self.table.setItem(r, 0, chk)
             for c, (key, _title) in enumerate(COLUMNS):
                 if key == PICKUP_DEADLINE_KEY:
                     val = pickup_deadline(it)
-                elif key == ACTIVITY_COL_KEY:
-                    val = self._activity_label(it.get(ACTIVITY_ID_KEY)) or None
                 else:
                     val = it.get(key)
-                self.table.setItem(r, c, QTableWidgetItem("" if val is None else str(val)))
+                self.table.setItem(r, c + 1, QTableWidgetItem("" if val is None else str(val)))
         self.table.setSortingEnabled(True)
         self.table.resizeColumnsToContents()
 
@@ -859,9 +897,39 @@ class StatusTab(QWidget):
         self.mw.handle_error(err)
 
     # ---- 改狀態 ---- #
+    def _row_to_item(self, view_row: int) -> Optional[dict]:
+        it0 = self.table.item(view_row, 0)
+        if it0 is None:
+            return None
+        idx = it0.data(Qt.UserRole)
+        if isinstance(idx, int) and 0 <= idx < len(self.rows_items):
+            return self.rows_items[idx]
+        return None
+
     def _selected_items(self) -> list[dict]:
-        rows = sorted({idx.row() for idx in self.table.selectionModel().selectedRows()})
-        return [self.rows_items[r] for r in rows if 0 <= r < len(self.rows_items)]
+        """以「勾選」為主；若一個都沒勾，退而採用反白選取的列（沿用舊習慣）。"""
+        checked = []
+        for row in range(self.table.rowCount()):
+            it0 = self.table.item(row, 0)
+            if it0 is not None and it0.checkState() == Qt.Checked:
+                rec = self._row_to_item(row)
+                if rec is not None:
+                    checked.append(rec)
+        if checked:
+            return checked
+        out = []
+        for row in sorted({idx.row() for idx in self.table.selectionModel().selectedRows()}):
+            rec = self._row_to_item(row)
+            if rec is not None:
+                out.append(rec)
+        return out
+
+    def _set_all_checks(self, checked: bool):
+        state = Qt.Checked if checked else Qt.Unchecked
+        for row in range(self.table.rowCount()):
+            it0 = self.table.item(row, 0)
+            if it0 is not None:
+                it0.setCheckState(state)
 
     def apply_change(self):
         selected = self._selected_items()
@@ -975,6 +1043,72 @@ class StatusTab(QWidget):
 
 
 # ====================================================================== #
+# 分頁 4：變更紀錄（狀態變更偵測）
+# ====================================================================== #
+class ChangeLogTab(QWidget):
+    def __init__(self, mw: "MainWindow"):
+        super().__init__()
+        self.mw = mw
+        root = QVBoxLayout(self)
+
+        info = QLabel(
+            "此頁用「快照比對」偵測狀態變更：App 每次載入資料時，發現某筆狀態和上次不同就記一筆"
+            "（含後台那邊直接改的，例如放棄／取消）。\n"
+            "註：從開始使用本功能後才會累積；「偵測時間」是 App 發現的時間（非實際變更時間）；"
+            "後台未提供「誰改的」，故不顯示操作者。"
+        )
+        info.setStyleSheet("color:#868e96;")
+        info.setWordWrap(True)
+        root.addWidget(info)
+
+        bar = QHBoxLayout()
+        self.refresh_btn = QPushButton("重新整理")
+        self.refresh_btn.clicked.connect(self.reload)
+        bar.addWidget(self.refresh_btn)
+        bar.addWidget(QLabel("篩新狀態："))
+        self.f_status = QComboBox()
+        self.f_status.addItem("全部", None)
+        for code in CHANGE_STATUS_OPTIONS:
+            self.f_status.addItem(STATUS_CODE_TO_NAME[code], STATUS_CODE_TO_NAME[code])
+        self.f_status.currentIndexChanged.connect(self.reload)
+        bar.addWidget(self.f_status)
+        bar.addStretch()
+        self.count_label = QLabel("—")
+        self.count_label.setStyleSheet("color:#1f6feb;font-weight:bold;")
+        bar.addWidget(self.count_label)
+        root.addLayout(bar)
+
+        cols = ["偵測時間", "預約單號", "姓名", "型號", "原狀態", "新狀態"]
+        self.table = QTableWidget()
+        self.table.setColumnCount(len(cols))
+        self.table.setHorizontalHeaderLabels(cols)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setSortingEnabled(True)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        root.addWidget(self.table, 1)
+
+    def reload(self):
+        flt = self.f_status.currentData()
+        rows = list(reversed(changelog.all_changes()))  # 最新在上
+        if flt:
+            rows = [r for r in rows if flt in (r.get("newStatusName") or "")]
+        self.table.setSortingEnabled(False)
+        self.table.setRowCount(len(rows))
+        for i, r in enumerate(rows):
+            vals = [r.get("detectedAt"), r.get("orderSNo"), r.get("subscriberName"),
+                    r.get("productName"), r.get("oldStatusName"), r.get("newStatusName")]
+            for c, v in enumerate(vals):
+                self.table.setItem(i, c, QTableWidgetItem("" if v is None else str(v)))
+        self.table.setSortingEnabled(True)
+        self.table.resizeColumnsToContents()
+        self.count_label.setText(f"共 {len(rows)} 筆變更")
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.reload()
+
+
+# ====================================================================== #
 # 主視窗
 # ====================================================================== #
 class MainWindow(QMainWindow):
@@ -988,9 +1122,11 @@ class MainWindow(QMainWindow):
         self.overview = OverviewTab(api, self)
         self.range = RangeTab(api, self)
         self.status_tab = StatusTab(api, self)
+        self.changelog_tab = ChangeLogTab(self)
         tabs.addTab(self.overview, "預約總覽")
         tabs.addTab(self.range, "區間查詢")
         tabs.addTab(self.status_tab, "狀態管理")
+        tabs.addTab(self.changelog_tab, "變更紀錄")
         self.setCentralWidget(tabs)
 
         self.statusBar().showMessage(f"已登入：{api.shop_name}（{api.user_name}）")
