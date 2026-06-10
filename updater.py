@@ -30,6 +30,12 @@ PROTECTED = {
     CONFIG_NAME, "config.json", ".update_token", ".DS_Store",
 }
 
+# 公開 repo 的預設更新來源：不需 token 即可檢查／下載更新。
+# 若日後改為私有，於 update_config.json 補上 token 即可（會覆蓋以下預設）。
+DEFAULT_OWNER = "pony9632-pixel"
+DEFAULT_REPO = "studioa-reservation-manager"
+DEFAULT_BRANCH = "main"
+
 
 # ---------------------------------------------------------------- #
 # 版本比較
@@ -65,24 +71,37 @@ def current_version(app_dir: str) -> str:
 
 
 def load_config(app_dir: str) -> Optional[dict]:
+    """回傳更新設定。
+
+    公開 repo 用內建預設即可（不需 token）；若存在 update_config.json，
+    其中有設定的欄位會覆蓋預設（例如改私有後補上 token）。
+    """
+    cfg = {
+        "owner": DEFAULT_OWNER,
+        "repo": DEFAULT_REPO,
+        "branch": DEFAULT_BRANCH,
+        "token": "",
+    }
     path = os.path.join(app_dir, CONFIG_NAME)
     try:
         with open(path, encoding="utf-8") as f:
-            cfg = json.load(f)
-        if cfg.get("owner") and cfg.get("repo") and cfg.get("token"):
-            cfg.setdefault("branch", "main")
-            return cfg
+            data = json.load(f)
+        for k in ("owner", "repo", "branch", "token"):
+            if data.get(k):
+                cfg[k] = data[k]
     except Exception:
         pass
-    return None
+    return cfg if cfg.get("owner") and cfg.get("repo") else None
 
 
 def _headers(token: str, raw: bool = False) -> dict:
-    return {
-        "Authorization": f"Bearer {token}",
+    h = {
         "Accept": "application/vnd.github.raw" if raw else "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
+    if token:  # 公開 repo 可不帶 token；私有時才需要
+        h["Authorization"] = f"Bearer {token}"
+    return h
 
 
 # ---------------------------------------------------------------- #
