@@ -535,13 +535,13 @@ def product_category(product_name: Optional[str]) -> str:
 COLUMNS = [
     ("orderSNo", "預約單號"),
     ("statusName", "狀態"),
+    ("subscriberName", "姓名"),
+    ("subscriberContactNumber", "電話"),
     (PICKUP_DEADLINE_KEY, "預計取機時間(已到貨/保留)"),
     ("productName", "型號"),
     (ACTIVITY_COL_KEY, "活動名稱"),
     ("userClassName", "會員等級"),
     ("vipId", "會員代碼"),
-    ("subscriberName", "姓名"),
-    ("subscriberContactNumber", "電話"),
     ("reservationTimeValue", "預約時間"),
     ("shopName", "門市"),
 ]
