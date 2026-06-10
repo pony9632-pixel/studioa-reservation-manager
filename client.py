@@ -26,6 +26,7 @@ EP_LOGIN = f"{BASE}/shopcms/admin-user-login/login"
 EP_VALID = f"{BASE}/shopcms/admin-user-login/valid-token"
 EP_LIST = f"{BASE}/shopcms/reservation-activity/reservation-user-list"
 EP_UPDATE_STATUS = f"{BASE}/shopcms/reservation-activity/reservation-status"
+EP_ACTIVITIES = f"{BASE}/shopcms/reservation-activity/dropdown-list"
 
 # 狀態代碼對照（見 api_notes.md）
 STATUS_CODE_TO_NAME: dict[int, str] = {
@@ -249,6 +250,14 @@ class StudioAClient:
         stats = {k: v for k, v in first.items() if k != "userReservationListOutDtos"}
         stats["itemsTotalCount"] = total
         return stats, items
+
+    def fetch_activities(self) -> list[dict]:
+        """取得『預約活動』下拉清單。回傳 [{'id': GUID, 'name': 名稱, ...}, ...]。
+
+        每筆預約帶 `reservationActivityId`，可用本清單把 id 對應成活動名稱。
+        """
+        data = self._request("GET", EP_ACTIVITIES)
+        return data if isinstance(data, list) else []
 
     def find_by_order_sno(self, order_sno: str) -> list[dict]:
         """用預約單號查單。回傳符合的明細清單（通常 1 筆）。

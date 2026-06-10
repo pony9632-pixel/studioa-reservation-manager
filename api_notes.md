@@ -74,6 +74,7 @@ data: {
 | `productOrderId` | string | 訂單ID |
 | `shopName` / `shopId` | string | 門市 |
 | `productName` | string | **型號**（型號統計用） |
+| `reservationActivityId` | string(GUID) | **預約活動 id**（對應活動清單 API 的 `id`→名稱） |
 | `userClassName` / `userClass` | string/num | **會員等級**（會員統計用） |
 | `subscriberName` | string | 預約人姓名（個資） |
 | `subscriberContactNumber` | string | 聯絡電話（個資） |
@@ -105,7 +106,7 @@ Body：
 ## 3) 下拉/列舉資料
 - `GET /backend/api/shopcms/reservation-activity/shop-picking-up-status-dropdown-list` → 篩選用狀態清單（全部 7 種）
 - `GET /backend/api/shopcms/reservation-activity/product-order-product-shelf-status-dropdown-list` → **門市可手動變更的狀態**：已到貨(5)/保留(6)/已取貨(7)
-- `GET /backend/api/shopcms/reservation-activity/dropdown-list` → 預約活動
+- `GET /backend/api/shopcms/reservation-activity/dropdown-list` → 預約活動（回傳 `[{id, name, slug}]`；`id` 對應單筆預約的 `reservationActivityId`）
 - `GET /backend/api/shopcms/reservation-activity/shop-batch-no-list?deliveryMethod=2` → 梯次
 - `GET /backend/api/shopcms/shop/dropdown-list` → 門市清單
 - `GET /backend/api/public/enum/user-class-enum` → 會員等級列舉

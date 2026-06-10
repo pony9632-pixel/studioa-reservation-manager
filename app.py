@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QGridLayout, QFormLayout, QLabel, QLineEdit, QPushButton, QCheckBox,
     QComboBox, QDateEdit, QTableWidget, QTableWidgetItem, QTabWidget,
     QMessageBox, QFrame, QHeaderView, QAbstractItemView, QGroupBox, QSizePolicy,
-    QButtonGroup,
+    QButtonGroup, QInputDialog,
 )
 
 import client
@@ -509,29 +509,9 @@ def pickup_deadline(it: dict) -> str:
 
 PICKUP_DEADLINE_KEY = "_pickupDeadline"
 ACTIVITY_COL_KEY = "_activity"
-
-# 「活動名稱」在單筆資料裡的欄位名稱未在 api_notes 明確記載，
-# 這裡列出最可能的鍵名，載入資料時自動偵測（偵測不到就停用活動篩選）。
-ACTIVITY_KEY_CANDIDATES = [
-    "reservationActivityName", "reservationActivityTitle", "reservationName",
-    "activityName", "activityTitle", "reservationActivity", "campaignName",
-]
-
-
-def detect_activity_key(items: list[dict]) -> Optional[str]:
-    """從實際資料中找出存放「活動名稱」的欄位；找不到回傳 None。"""
-    keys: set[str] = set()
-    for it in items[:50]:
-        if isinstance(it, dict):
-            keys.update(it.keys())
-    for cand in ACTIVITY_KEY_CANDIDATES:
-        if cand in keys:
-            return cand
-    for k in keys:  # 退而求其次：任何同時含 activity 與 name/title 的鍵
-        lk = k.lower()
-        if "activity" in lk and ("name" in lk or "title" in lk):
-            return k
-    return None
+# 每筆預約帶 reservationActivityId（GUID）；活動「名稱」由
+# client.fetch_activities()（reservation-activity/dropdown-list）對應而來。
+ACTIVITY_ID_KEY = "reservationActivityId"
 
 
 # 產品大分類：由型號字串（productName）關鍵字判斷
@@ -566,6 +546,37 @@ COLUMNS = [
     ("shopName", "門市"),
 ]
 
+# 標籤版型（見 labels.py）
+LABEL_LAYOUT_LABELS = {
+    "mac": "Mac 版（每頁 30 張，小方貼）",
+    "iphone": "iPhone 版（每頁 48 張，長條貼）",
+}
+
+
+def _ensure_reportlab():
+    """確保 reportlab 可用；缺少時嘗試以目前 Python 自動安裝（首次列印用）。"""
+    try:
+        import reportlab  # noqa: F401
+        return
+    except ImportError:
+        pass
+    import subprocess
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "reportlab",
+             "--quiet", "--disable-pip-version-check"],
+            check=True,
+        )
+    except Exception as e:
+        raise StudioAError(
+            "列印需要 reportlab 元件，但自動安裝失敗。\n"
+            f"請在終端機執行：pip3 install reportlab\n（{e}）"
+        )
+    try:
+        import reportlab  # noqa: F401
+    except ImportError:
+        raise StudioAError("已安裝 reportlab 但仍無法載入，請關閉程式重開再試。")
+
 
 class StatusTab(QWidget):
     def __init__(self, api: StudioAClient, mw: "MainWindow"):
@@ -575,7 +586,7 @@ class StatusTab(QWidget):
         self.rows_items: list[dict] = []
         self._all_items: list[dict] = []
         self._cat: str = "全部"
-        self._activity_key: Optional[str] = None
+        self._activity_map: dict[str, str] = {}  # reservationActivityId -> 活動名稱
         self._cat_buttons: dict[str, QPushButton] = {}
         root = QVBoxLayout(self)
 
@@ -681,11 +692,18 @@ class StatusTab(QWidget):
         self.apply_btn.setStyleSheet("font-weight:bold;")
         self.apply_btn.clicked.connect(self.apply_change)
         change.addWidget(self.apply_btn)
+        change.addSpacing(18)
+        self.print_btn = QPushButton("🖨 列印標籤")
+        self.print_btn.clicked.connect(self.print_labels)
+        change.addWidget(self.print_btn)
         change.addStretch()
         self.hint = QLabel("提示：門市標準可改「已到貨/保留/已取貨」；其他狀態若後台不允許會顯示錯誤訊息。")
         self.hint.setStyleSheet("color:#868e96;")
         root.addWidget(self.hint)
         root.addLayout(change)
+
+        # 背景載入「預約活動」清單（id→名稱），供活動篩選與表格顯示
+        self._load_activities()
 
     # ---- 查詢 ---- #
     def _update_placeholder(self):
@@ -736,9 +754,32 @@ class StatusTab(QWidget):
         self._cat = button.text()
         self._apply_filters()
 
-    def _populate_filter_options(self, items):
-        self._activity_key = detect_activity_key(items)
+    def _activity_label(self, aid) -> str:
+        """活動 id → 顯示名稱；沒對到名稱時退而顯示 id 片段。"""
+        if not aid:
+            return ""
+        return self._activity_map.get(aid) or f"活動 {str(aid)[:8]}…"
 
+    def _load_activities(self):
+        """背景抓『預約活動』清單，建立 id→名稱對照。容錯：失敗就用 id 片段顯示。"""
+        def task():
+            return self.api.fetch_activities()
+
+        def ok(lst):
+            self._activity_map = {
+                a.get("id"): (a.get("name") or "").strip()
+                for a in (lst or []) if a.get("id")
+            }
+            if self._all_items:  # 名稱晚到：重整活動下拉與表格
+                self._populate_filter_options(self._all_items)
+                self._apply_filters()
+
+        def fail(_err):
+            pass  # 抓不到活動名稱不影響其他功能
+
+        run_async(self, task, ok, fail)
+
+    def _populate_filter_options(self, items):
         def fill(combo, all_label, values):
             combo.blockSignals(True)
             combo.clear()
@@ -748,15 +789,22 @@ class StatusTab(QWidget):
             combo.setCurrentIndex(0)
             combo.blockSignals(False)
 
-        if self._activity_key:
-            acts = sorted({it.get(self._activity_key) for it in items if it.get(self._activity_key)})
-            self.f_activity.setEnabled(True)
-            self.f_activity.setToolTip("")
-            fill(self.f_activity, "全部活動", acts)
-        else:
-            self.f_activity.setEnabled(False)
-            self.f_activity.setToolTip("這批資料裡找不到活動名稱欄位")
-            fill(self.f_activity, "（無活動欄位）", [])
+        # 活動：用本批資料出現過的 reservationActivityId，名稱來自活動清單 API
+        seen, act_ids = set(), []
+        for it in items:
+            aid = it.get(ACTIVITY_ID_KEY)
+            if aid and aid not in seen:
+                seen.add(aid)
+                act_ids.append(aid)
+        act_ids.sort(key=self._activity_label)
+        self.f_activity.blockSignals(True)
+        self.f_activity.clear()
+        self.f_activity.addItem("全部活動", None)
+        for aid in act_ids:
+            self.f_activity.addItem(self._activity_label(aid), aid)
+        self.f_activity.setCurrentIndex(0)
+        self.f_activity.setEnabled(bool(act_ids))
+        self.f_activity.blockSignals(False)
 
         levels = sorted({it.get("userClassName") for it in items if it.get("userClassName")})
         fill(self.f_level, "全部等級", levels)
@@ -779,10 +827,8 @@ class StatusTab(QWidget):
         for it in self._all_items:
             if cat and cat != "全部" and product_category(it.get("productName")) != cat:
                 continue
-            if act is not None:
-                v = it.get(self._activity_key) if self._activity_key else None
-                if v != act:
-                    continue
+            if act is not None and it.get(ACTIVITY_ID_KEY) != act:
+                continue
             if lvl is not None and it.get("userClassName") != lvl:
                 continue
             if sta is not None and it.get("statusName") != sta:
@@ -800,7 +846,7 @@ class StatusTab(QWidget):
                 if key == PICKUP_DEADLINE_KEY:
                     val = pickup_deadline(it)
                 elif key == ACTIVITY_COL_KEY:
-                    val = it.get(self._activity_key) if self._activity_key else None
+                    val = self._activity_label(it.get(ACTIVITY_ID_KEY)) or None
                 else:
                     val = it.get(key)
                 self.table.setItem(r, c, QTableWidgetItem("" if val is None else str(val)))
@@ -855,6 +901,77 @@ class StatusTab(QWidget):
             self.mw.handle_error(f"變更失敗：{err}")
 
         run_async(self, lambda: self.api.update_status(shelf_ids, code), ok, fail)
+
+    # ---- 列印標籤 ---- #
+    def _item_to_label_record(self, it: dict) -> dict:
+        return {
+            "預約單號": it.get("orderSNo") or "",
+            "會員代碼": it.get("vipId") or "",
+            "姓名": it.get("subscriberName") or "",
+            "手機號碼": it.get("subscriberContactNumber") or "",
+            "梯次": it.get("batchNo") or "",
+            "預約產品": it.get("productName") or "",
+            "預計取機時間": pickup_deadline(it),
+        }
+
+    def _pick_layout(self) -> Optional[str]:
+        items = [LABEL_LAYOUT_LABELS["mac"], LABEL_LAYOUT_LABELS["iphone"]]
+        choice, ok = QInputDialog.getItem(
+            self, "選擇標籤版型", "要用哪種標籤紙？", items, 0, False)
+        if not ok:
+            return None
+        return "mac" if choice.startswith("Mac") else "iphone"
+
+    def print_labels(self):
+        selected = self._selected_items()
+        if not selected:
+            self.mw.handle_error("請先在表格中選取要列印的單據（可多選）。")
+            return
+        # 提醒：選到非「已到貨」(5) 的列
+        not_arrived = [it for it in selected if it.get("status") != 5]
+        if not_arrived:
+            confirm = QMessageBox.question(
+                self, "確認列印",
+                f"選取的 {len(selected)} 筆中有 {len(not_arrived)} 筆不是「已到貨」。\n仍要列印標籤嗎？",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            )
+            if confirm != QMessageBox.Yes:
+                return
+
+        layout = self._pick_layout()
+        if not layout:
+            return
+
+        records = [self._item_to_label_record(it) for it in selected]
+        out_path = os.path.join(
+            os.path.expanduser("~/Desktop"),
+            f"標籤_{dt.datetime.now():%Y%m%d_%H%M%S}.pdf",
+        )
+        self.print_btn.setEnabled(False); self.print_btn.setText("產生中…")
+        self.mw.status("產生標籤 PDF（首次可能需安裝列印元件）…")
+
+        def task():
+            _ensure_reportlab()
+            import labels
+            pages = labels.generate_pdf(records, out_path, layout=layout)
+            return (out_path, pages)
+
+        def ok(result):
+            path, pages = result
+            self.print_btn.setEnabled(True); self.print_btn.setText("🖨 列印標籤")
+            os.system(f'open "{path}"')
+            self.mw.status(f"已產生 {len(records)} 張標籤（{pages} 頁）。")
+            QMessageBox.information(
+                self, "完成",
+                f"已產生 {len(records)} 張標籤，共 {pages} 頁：\n{path}\n\n"
+                "已自動開啟，請按 Cmd+P 列印。",
+            )
+
+        def fail(err):
+            self.print_btn.setEnabled(True); self.print_btn.setText("🖨 列印標籤")
+            self.mw.handle_error(f"產生標籤失敗：{err}")
+
+        run_async(self, task, ok, fail)
 
 
 # ====================================================================== #
