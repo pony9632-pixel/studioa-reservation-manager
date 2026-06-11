@@ -1169,14 +1169,35 @@ class FillTab(QWidget):
         sv.addWidget(self.sum_table)
         root.addWidget(sumbox, 2)
 
+        self._fill_items: list[dict] = []
         listbox = QGroupBox("候補名單")
         lv = QVBoxLayout(listbox)
         self.list_table = QTableWidget()
-        self.list_table.setColumnCount(len(FILL_COLUMNS))
-        self.list_table.setHorizontalHeaderLabels([c[1] for c in FILL_COLUMNS])
+        self.list_table.setColumnCount(len(FILL_COLUMNS) + 1)
+        self.list_table.setHorizontalHeaderLabels(["✓"] + [c[1] for c in FILL_COLUMNS])
         self.list_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.list_table.setSortingEnabled(True)
+        self.list_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         lv.addWidget(self.list_table)
+
+        act = QHBoxLayout()
+        self.fill_all_btn = QPushButton("全選")
+        self.fill_all_btn.clicked.connect(lambda: self._set_all_fill_checks(True))
+        self.fill_none_btn = QPushButton("全不選")
+        self.fill_none_btn.clicked.connect(lambda: self._set_all_fill_checks(False))
+        act.addWidget(self.fill_all_btn)
+        act.addWidget(self.fill_none_btn)
+        act.addStretch()
+        self.fill_btn = QPushButton("🔁 遞補選取")
+        self.fill_btn.setObjectName("primary")
+        self.fill_btn.clicked.connect(self.do_fill)
+        act.addWidget(self.fill_btn)
+        lv.addLayout(act)
+
+        hint = QLabel("提示：勾選候補名單中要遞補的單據，按「遞補選取」會把他們遞補進去（會更新後台，送出前會再確認）。")
+        hint.setStyleSheet("color:#79839a;")
+        hint.setWordWrap(True)
+        lv.addWidget(hint)
+
         root.addWidget(listbox, 3)
 
     def search(self):
@@ -1216,15 +1237,76 @@ class FillTab(QWidget):
         self.sum_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
 
         rows = data.get("fillListOutDtos", []) or []
-        self.list_table.setSortingEnabled(False)
+        self._fill_items = rows
         self.list_table.setRowCount(len(rows))
         for i, it in enumerate(rows):
+            chk = QTableWidgetItem()
+            chk.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            chk.setCheckState(Qt.Unchecked)
+            chk.setData(Qt.UserRole, i)
+            chk.setTextAlignment(Qt.AlignCenter)
+            self.list_table.setItem(i, 0, chk)
             for c, (key, _t) in enumerate(FILL_COLUMNS):
                 val = it.get(key)
-                self.list_table.setItem(i, c, QTableWidgetItem("" if val is None else str(val)))
-        self.list_table.setSortingEnabled(True)
+                self.list_table.setItem(i, c + 1, QTableWidgetItem("" if val is None else str(val)))
         self.list_table.resizeColumnsToContents()
         self.count_label.setText(f"可遞補產品 {len(prods)} 種 ・ 候補名單 {len(rows)} 筆")
+
+    def _fill_selected_items(self) -> list[dict]:
+        out = []
+        for row in range(self.list_table.rowCount()):
+            it0 = self.list_table.item(row, 0)
+            if it0 is not None and it0.checkState() == Qt.Checked:
+                idx = it0.data(Qt.UserRole)
+                if isinstance(idx, int) and 0 <= idx < len(self._fill_items):
+                    out.append(self._fill_items[idx])
+        return out
+
+    def _set_all_fill_checks(self, checked: bool):
+        st = Qt.Checked if checked else Qt.Unchecked
+        for row in range(self.list_table.rowCount()):
+            it0 = self.list_table.item(row, 0)
+            if it0 is not None:
+                it0.setCheckState(st)
+
+    def do_fill(self):
+        selected = self._fill_selected_items()
+        if not selected:
+            self.mw.handle_error("請先在候補名單勾選要遞補的單據（可多選）。")
+            return
+        preview = "、".join((it.get("subscriberName") or "?") for it in selected[:6])
+        if len(selected) > 6:
+            preview += " …"
+        confirm = QMessageBox.question(
+            self, "確認遞補",
+            f"確定要把勾選的這 {len(selected)} 筆候補遞補進去嗎？\n\n{preview}\n\n"
+            "此動作會更新後台、無法在 App 復原。",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if confirm != QMessageBox.Yes:
+            return
+        ids = [it.get("productOrderProductShelfId") for it in selected
+               if it.get("productOrderProductShelfId")]
+        self.fill_btn.setEnabled(False)
+        self.fill_btn.setText("遞補中…")
+        self.mw.status("送出遞補…")
+
+        def task():
+            return self.api.fill_reservations(ids)
+
+        def ok(msg):
+            self.fill_btn.setEnabled(True)
+            self.fill_btn.setText("🔁 遞補選取")
+            QMessageBox.information(self, "完成", msg)
+            self.mw.status(msg)
+            self.search()
+
+        def fail(err):
+            self.fill_btn.setEnabled(True)
+            self.fill_btn.setText("🔁 遞補選取")
+            self.mw.handle_error(err)
+
+        run_async(self, task, ok, fail)
 
 
 # ====================================================================== #

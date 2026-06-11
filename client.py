@@ -28,6 +28,7 @@ EP_LIST = f"{BASE}/shopcms/reservation-activity/reservation-user-list"
 EP_UPDATE_STATUS = f"{BASE}/shopcms/reservation-activity/reservation-status"
 EP_ACTIVITIES = f"{BASE}/shopcms/reservation-activity/dropdown-list"
 EP_FILL_LIST = f"{BASE}/shopcms/reservation-activity/fill-list"
+EP_FILL = f"{BASE}/shopcms/reservation-activity/fill"
 
 # 狀態代碼對照（見 api_notes.md）
 STATUS_CODE_TO_NAME: dict[int, str] = {
@@ -276,6 +277,23 @@ class StudioAClient:
         }
         data = self._request("GET", EP_FILL_LIST, params=params)
         return data if isinstance(data, dict) else {}
+
+    def fill_reservations(self, shelf_ids: list[str], *,
+                          delivery_method: int = DELIVERY_METHOD_STORE_PICKUP) -> str:
+        """把候補的單據「遞補」進去（寫入後台）。
+
+        shelf_ids：各候補單的 productOrderProductShelfId。
+        對應後台「門市遞補」頁的「遞補」按鈕：POST reservation-activity/fill。
+        """
+        if not shelf_ids:
+            raise StudioAError("沒有要遞補的單據。")
+        payload = {
+            "productOrderProductShelfIds": list(shelf_ids),
+            "reservationFillReasonDtos": [],
+            "deliveryMethod": delivery_method,
+        }
+        self._request("POST", EP_FILL, json=payload)
+        return f"已遞補 {len(shelf_ids)} 筆"
 
     def find_by_order_sno(self, order_sno: str) -> list[dict]:
         """用預約單號查單。回傳符合的明細清單（通常 1 筆）。
