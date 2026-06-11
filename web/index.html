@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudioA 門市預約管理</title>
+<style>
+  :root {
+    --blue: #2f6bf0;
+    --blue-dark: #2356cc;
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --border: #e9edf4;
+    --input-border: #d7deea;
+    --text: #20283a;
+    --muted: #79839a;
+    --sidebar: #1c2540;
+    --nav-text: #b9c2db;
+    --red: #c0392b;
+  }
+  * { box-sizing: border-box; font-family: "Noto Sans TC", "PingFang TC", "Heiti TC", "Helvetica Neue", sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* ---------- 版面：側欄 + 內容 ---------- */
+  #app { display: flex; height: 100vh; }
+  #sidebar { width: 212px; background: var(--sidebar); display: flex; flex-direction: column; flex-shrink: 0; }
+  #logo { display: flex; align-items: center; gap: 10px; padding: 18px 14px 10px 18px; }
+  #logo .badge { width: 34px; height: 34px; background: var(--blue); color: #fff; border-radius: 9px;
+                 display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; }
+  #logo .t1 { color: #fff; font-size: 15px; font-weight: bold; }
+  #logo .t2 { color: #9aa3b5; font-size: 11px; }
+  #sidebar .section { color: #5e6b8e; font-size: 11px; padding: 10px 22px 4px; }
+  #nav { flex: 1; }
+  #nav .item { color: var(--nav-text); padding: 11px 14px; border-radius: 10px; margin: 2px 10px; cursor: pointer; }
+  #nav .item:hover { background: rgba(255,255,255,.07); color: #fff; }
+  #nav .item.active { background: var(--blue); color: #fff; }
+  #userbox { display: flex; align-items: center; gap: 10px; padding: 12px 16px 16px; }
+  #userbox .avatar { width: 32px; height: 32px; background: #34405a; color: #fff; border-radius: 8px;
+                     display: flex; align-items: center; justify-content: center; font-weight: bold; }
+  #userbox .name { color: #fff; font-size: 12px; font-weight: bold; }
+  #userbox .sub { color: #9aa3b5; font-size: 11px; }
+  #relogin { color: #9aa3b5; font-size: 11px; cursor: pointer; text-decoration: underline; }
+  #relogin:hover { color: #fff; }
+
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #content { flex: 1; overflow: auto; padding: 16px; }
+  #statusbar { background: #fff; border-top: 1px solid var(--border); color: var(--muted);
+               padding: 6px 14px; font-size: 12px; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ---------- 元件 ---------- */
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .box { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+  .box > h3 { margin: 0 0 10px; font-size: 14px; font-weight: 500; color: var(--muted); }
+  button { background: #fff; color: var(--text); border: 1px solid var(--input-border);
+           border-radius: 10px; padding: 7px 14px; cursor: pointer; font-size: 14px; }
+  button:hover { background: #eef2fb; }
+  button:disabled { color: #aab2c4; background: var(--bg); cursor: default; }
+  button.primary { background: var(--blue); color: #fff; border: none; font-weight: 500; }
+  button.primary:hover { background: var(--blue-dark); }
+  button.primary:disabled { background: #9bb6f4; color: #eef2fb; }
+  button.toggle.on { background: var(--blue); color: #fff; border-color: var(--blue); }
+  input[type=text], input[type=password], input[type=date], select {
+    background: #fff; color: var(--text); border: 1px solid var(--input-border);
+    border-radius: 10px; padding: 7px 10px; font-size: 14px; }
+  input:focus, select:focus { outline: none; border-color: var(--blue); }
+  label.chk { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+  .muted { color: var(--muted); }
+  .count { color: var(--blue); font-weight: bold; }
+
+  table { width: 100%; border-collapse: collapse; background: #fff; }
+  .tablewrap { background: #fff; border: 1px solid var(--border); border-radius: 12px; overflow: auto; }
+  th { background: #f6f8fc; color: var(--muted); font-weight: 500; text-align: left;
+       padding: 8px 8px; border-bottom: 1px solid var(--border); position: sticky; top: 0; white-space: nowrap; }
+  th.sortable { cursor: pointer; }
+  td { padding: 6px 8px; border-bottom: 1px solid #f0f3f9; white-space: nowrap; }
+  tr:hover td { background: #f6f9ff; }
+  td.num { text-align: right; }
+  .bar { background: #eef2f8; border-radius: 4px; height: 8px; width: 120px; }
+  .bar > i { display: block; background: var(--blue); border-radius: 4px; height: 8px; }
+
+  /* 統計卡片 */
+  #cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 14px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+  .card .ic { width: 32px; height: 32px; border-radius: 9px; background: #eef2fb;
+              display: flex; align-items: center; justify-content: center; font-size: 15px; margin-bottom: 6px; }
+  .card .t { color: var(--muted); font-size: 13px; }
+  .card .v { font-size: 26px; font-weight: bold; }
+  .card.hl { background: var(--blue); border-color: var(--blue); }
+  .card.hl .t { color: #dbe9ff; }
+  .card.hl .v { color: #fff; }
+  .card.hl .ic { background: rgba(255,255,255,.2); }
+
+  .cols2 { display: flex; gap: 14px; align-items: flex-start; }
+  .cols2 > div { min-width: 0; }
+
+  #bignum { text-align: center; font-size: 40px; font-weight: bold; color: #1f6feb; padding: 10px; }
+  #bigsub { text-align: center; color: var(--muted); margin-bottom: 12px; }
+
+  /* ---------- 登入畫面 ---------- */
+  #login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 100;
+                   display: flex; align-items: center; justify-content: center; }
+  #login-card { background: #fff; border: 1px solid var(--border); border-radius: 16px;
+                padding: 28px 30px; width: 360px; box-shadow: 0 10px 40px rgba(28,37,64,.08); }
+  #login-card h2 { text-align: center; margin: 0 0 2px; font-size: 18px; }
+  #login-card .ver { text-align: center; color: #868e96; font-size: 12px; margin-bottom: 16px; }
+  #login-card .field { margin-bottom: 10px; }
+  #login-card .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  #login-card input[type=text], #login-card input[type=password] { width: 100%; }
+  #login-msg { color: var(--red); font-size: 13px; min-height: 18px; margin: 6px 0; }
+  #login-btn { width: 100%; margin-top: 4px; }
+
+  /* ---------- 對話框 ---------- */
+  dialog { border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; max-width: 420px; }
+  dialog::backdrop { background: rgba(28,37,64,.35); }
+  dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+  @media (max-width: 1000px) { #cards { grid-template-columns: repeat(3, 1fr); } .cols2 { flex-direction: column; } }
+</style>
+</head>
+<body>
+
+<!-- 登入 -->
+<div id="login-overlay">
+  <div id="login-card">
+    <h2>門市預約後台登入</h2>
+    <div class="ver" id="login-ver">版本 —</div>
+    <div class="field"><label>帳號</label><input type="text" id="login-user" placeholder="帳號（email）" autocomplete="username"></div>
+    <div class="field"><label>密碼</label><input type="password" id="login-pwd" placeholder="密碼" autocomplete="current-password"></div>
+    <label class="chk"><input type="checkbox" id="login-remember"> 記住帳號（存在此瀏覽器）</label>
+    <div id="login-msg"></div>
+    <button class="primary" id="login-btn">登入</button>
+  </div>
+</div>
+
+<div id="app" style="visibility:hidden">
+  <div id="sidebar">
+    <div id="logo">
+      <div class="badge">A</div>
+      <div><div class="t1">StudioA</div><div class="t2">門市預約管理</div></div>
+    </div>
+    <div class="section">主功能</div>
+    <div id="nav">
+      <div class="item active" data-view="overview">預約總覽</div>
+      <div class="item" data-view="range">區間查詢</div>
+      <div class="item" data-view="status">狀態管理</div>
+      <div class="item" data-view="fill">門市遞補</div>
+      <div class="item" data-view="changelog">變更紀錄</div>
+    </div>
+    <div id="userbox">
+      <div class="avatar" id="u-avatar">店</div>
+      <div style="min-width:0">
+        <div class="name" id="u-shop"></div>
+        <div class="sub" id="u-name"></div>
+        <div id="relogin">重新登入</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="content">
+
+      <!-- ① 預約總覽 -->
+      <div class="view active" id="view-overview">
+        <div class="row">
+          <span>預約日期區間：</span>
+          <input type="date" id="ov-start"> <span>～</span> <input type="date" id="ov-end">
+          <button class="primary" id="ov-query">查詢 / 重新整理</button>
+        </div>
+        <div id="cards">
+          <div class="card hl"><div class="ic">📦</div><div class="t">目前剩餘已預約</div><div class="v" id="c-reserved">—</div></div>
+          <div class="card"><div class="ic">📊</div><div class="t">總數量</div><div class="v" id="c-total">—</div></div>
+          <div class="card"><div class="ic">🚚</div><div class="t">已配貨</div><div class="v" id="c-alloc">—</div></div>
+          <div class="card"><div class="ic">✅</div><div class="t">已到貨</div><div class="v" id="c-arrival">—</div></div>
+          <div class="card"><div class="ic">⏳</div><div class="t">保留</div><div class="v" id="c-hold">—</div></div>
+          <div class="card"><div class="ic">🛍️</div><div class="t">已取貨</div><div class="v" id="c-pick">—</div></div>
+          <div class="card"><div class="ic">🚫</div><div class="t">放棄</div><div class="v" id="c-abandon">—</div></div>
+          <div class="card"><div class="ic">❌</div><div class="t">取消</div><div class="v" id="c-cancel">—</div></div>
+          <div class="card"><div class="ic">📈</div><div class="t">取貨率</div><div class="v" id="c-rate">—</div></div>
+        </div>
+        <div class="row">
+          <span>型號 / 會員統計範圍：</span>
+          <select id="ov-scope">
+            <option value="reserved">僅已預約（剩餘）</option>
+            <option value="unpicked">未取貨（已預約+配貨+到貨+保留）</option>
+            <option value="all">全部</option>
+          </select>
+        </div>
+        <div class="cols2">
+          <div class="box" style="flex:3"><h3>型號統計</h3><div class="tablewrap" id="ov-models"></div></div>
+          <div class="box" style="flex:2"><h3>會員等級統計</h3><div class="tablewrap" id="ov-members"></div></div>
+        </div>
+      </div>
+
+      <!-- ② 區間查詢 -->
+      <div class="view" id="view-range">
+        <div class="row">
+          <span>快速區間：</span>
+          <button data-days="0">今天</button>
+          <button data-days="6">最近7天</button>
+          <button data-days="13">最近14天</button>
+          <button data-days="29">最近30天</button>
+          <button data-days="-1">本月</button>
+        </div>
+        <div class="row">
+          <span>預約日期區間：</span>
+          <input type="date" id="rg-start"> <span>～</span> <input type="date" id="rg-end">
+          <button class="primary" id="rg-query">查詢</button>
+        </div>
+        <div id="bignum">—</div>
+        <div id="bigsub">選擇區間後按「查詢」</div>
+        <div class="cols2">
+          <div class="box" style="flex:1"><h3>各狀態筆數</h3><div class="tablewrap" id="rg-status"></div></div>
+          <div class="box" style="flex:1"><h3>每日新增筆數</h3><div class="tablewrap" id="rg-days"></div></div>
+        </div>
+      </div>
+
+      <!-- ③ 狀態管理 -->
+      <div class="view" id="view-status">
+        <div class="row">
+          <span>查詢方式：</span>
+          <select id="st-searchtype">
+            <option value="sno">預約單號</option>
+            <option value="phone">電話</option>
+          </select>
+          <input type="text" id="st-kw" placeholder="輸入預約單號後按 Enter 或「查詢」" style="flex:1;max-width:420px">
+          <button id="st-search">查詢</button>
+        </div>
+        <div class="box">
+          <h3>篩選（由上而下：大分類 → 活動／梯次／會員等級 → 狀態）</h3>
+          <div class="row" id="st-cats">
+            <span>大分類：</span>
+            <button class="toggle on" data-cat="全部">全部</button>
+            <button class="toggle" data-cat="Mac">Mac</button>
+            <button class="toggle" data-cat="iPhone">iPhone</button>
+            <button class="toggle" data-cat="iPad">iPad</button>
+            <button class="toggle" data-cat="AirPods">AirPods</button>
+            <button class="toggle" data-cat="其他">其他</button>
+          </div>
+          <div class="row">
+            <span>活動：</span><select id="st-activity" style="min-width:160px"><option value="">全部活動</option></select>
+            <span>梯次：</span><select id="st-batch" style="min-width:130px"><option value="">全部梯次</option></select>
+            <span>會員等級：</span><select id="st-level"><option value="">全部等級</option></select>
+          </div>
+          <div class="row" style="margin-bottom:0">
+            <span>狀態（可複選）：</span>
+            <span id="st-statuschecks"></span>
+            <button class="primary" id="st-query" style="font-weight:bold">查詢</button>
+            <span style="flex:1"></span>
+            <span class="count" id="st-count">—</span>
+          </div>
+        </div>
+        <div class="tablewrap" style="max-height:46vh" id="st-table"></div>
+        <div class="muted" style="margin:8px 0">提示：在表格最左欄「✓」勾選要處理的單據（可多選），再按送出變更或列印標籤。門市標準可改「已到貨/保留/已取貨」。</div>
+        <div class="row">
+          <button id="st-checkall">全選</button>
+          <button id="st-uncheckall">全不選</button>
+          <span style="width:16px"></span>
+          <span>將選取的單據改為：</span>
+          <select id="st-newstatus"></select>
+          <button class="primary" id="st-apply" style="font-weight:bold">送出變更</button>
+          <span style="width:18px"></span>
+          <button id="st-print">🖨 列印標籤</button>
+        </div>
+      </div>
+
+      <!-- ④ 門市遞補 -->
+      <div class="view" id="view-fill">
+        <div class="row">
+          <span>預約日期區間：</span>
+          <input type="date" id="fl-start"> <span>～</span> <input type="date" id="fl-end">
+          <button class="primary" id="fl-search">搜索</button>
+          <span style="flex:1"></span>
+          <span class="count" id="fl-count">—</span>
+        </div>
+        <div class="box"><h3>可遞補產品</h3><div class="tablewrap" style="max-height:30vh" id="fl-products"></div></div>
+        <div class="box">
+          <h3>候補名單</h3>
+          <div class="tablewrap" style="max-height:38vh" id="fl-table"></div>
+          <div class="row" style="margin:10px 0 0">
+            <button id="fl-checkall">全選</button>
+            <button id="fl-uncheckall">全不選</button>
+            <span style="flex:1"></span>
+            <button class="primary" id="fl-fill">🔁 遞補選取</button>
+          </div>
+          <div class="muted" style="margin-top:8px">提示：勾選候補名單中要遞補的單據，按「遞補選取」會把他們遞補進去（會更新後台，送出前會再確認）。</div>
+        </div>
+      </div>
+
+      <!-- ⑤ 變更紀錄 -->
+      <div class="view" id="view-changelog">
+        <div class="muted" style="margin-bottom:10px">
+          此頁用「快照比對」偵測狀態變更：每次載入資料時，發現某筆狀態和上次不同就記一筆（含後台那邊直接改的，例如放棄／取消）。<br>
+          註：從開始使用後才會累積；「偵測時間」是本程式發現的時間（非實際變更時間）；後台未提供「誰改的」，故不顯示操作者。
+        </div>
+        <div class="row">
+          <button id="cl-refresh">重新整理</button>
+          <span>篩新狀態：</span>
+          <select id="cl-filter"><option value="">全部</option></select>
+          <span style="flex:1"></span>
+          <span class="count" id="cl-count">—</span>
+        </div>
+        <div class="tablewrap" style="max-height:70vh" id="cl-table"></div>
+      </div>
+
+    </div>
+    <div id="statusbar">就緒。</div>
+  </div>
+</div>
+
+<!-- 標籤版型選擇 -->
+<dialog id="layout-dialog">
+  <div style="font-weight:bold;margin-bottom:10px">選擇標籤版型</div>
+  <div class="muted" style="margin-bottom:6px">要用哪種標籤紙？</div>
+  <div class="btns" style="justify-content:flex-start;flex-direction:column;align-items:stretch">
+    <button data-layout="mac">Mac 版（每頁 30 張，小方貼）</button>
+    <button data-layout="iphone">iPhone 版（每頁 48 張，長條貼）</button>
+    <button data-layout="">取消</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+// ===================== 共用 ===================== //
+const $ = (sel) => document.querySelector(sel);
+const STATUS_NAMES = {3:"已預約",4:"已配貨",5:"已到貨",6:"保留",7:"已取貨",8:"放棄",21:"已取消"};
+const CHANGE_STATUS_OPTIONS = [3,4,5,6,7,8,21];
+const SHOP_CHANGEABLE = [5,6,7];
+const UNPICKED = new Set([3,4,5,6]);
+
+function setStatus(text) { $("#statusbar").textContent = text; }
+function esc(s) { const d = document.createElement("span"); d.textContent = s ?? ""; return d.innerHTML; }
+function fmtDate(d) {
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function addDays(n) { const d = new Date(); d.setDate(d.getDate()+n); return d; }
+
+async function apiFetch(url, opts) {
+  let resp;
+  try { resp = await fetch(url, opts); }
+  catch (e) { throw new Error("連線本機伺服器失敗，請確認 web_app.py 仍在執行。"); }
+  const ct = resp.headers.get("Content-Type") || "";
+  if (ct.includes("application/pdf")) return resp.blob();
+  const body = await resp.json();
+  if (!resp.ok) {
+    if (resp.status === 401) { showLogin(body.error || "請重新登入。"); }
+    throw new Error(body.error || ("HTTP " + resp.status));
+  }
+  return body;
+}
+const apiGet = (url) => apiFetch(url);
+const apiPost = (url, data) => apiFetch(url, {
+  method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)
+});
+
+// 排行榜表格（名次 + 長條 + 數量）
+function renderRankTable(container, counter, colTitle) {
+  const rows = Object.entries(counter).sort((a, b) => b[1] - a[1]);
+  const maxc = rows.length ? rows[0][1] : 1;
+  let html = `<table><thead><tr><th>${esc(colTitle)}</th><th></th><th style="text-align:right">數量</th></tr></thead><tbody>`;
+  rows.forEach(([name, cnt], i) => {
+    html += `<tr><td>${i+1}.　${esc(name || "（無）")}</td>
+      <td><div class="bar"><i style="width:${Math.round(cnt/maxc*100)}%"></i></div></td>
+      <td class="num">${cnt}</td></tr>`;
+  });
+  container.innerHTML = html + "</tbody></table>";
+}
+
+function busy(btn, on, textOn, textOff) {
+  btn.disabled = on;
+  btn.textContent = on ? textOn : textOff;
+}
+
+// ===================== 登入 ===================== //
+function showLogin(msg) {
+  $("#login-msg").textContent = msg || "";
+  $("#login-overlay").style.display = "flex";
+  $("#login-pwd").value = "";
+  ($("#login-user").value ? $("#login-pwd") : $("#login-user")).focus();
+}
+
+async function doLogin() {
+  const user = $("#login-user").value.trim();
+  const pwd = $("#login-pwd").value;
+  const btn = $("#login-btn");
+  $("#login-msg").textContent = "";
+  busy(btn, true, "登入中…", "登入");
+  try {
+    const info = await apiPost("/api/login", {username: user, password: pwd});
+    localStorage.setItem("studioa_username", $("#login-remember").checked ? user : "");
+    $("#login-overlay").style.display = "none";
+    $("#app").style.visibility = "visible";
+    $("#u-shop").textContent = info.shopName || "";
+    $("#u-name").textContent = info.userName || "";
+    $("#u-avatar").textContent = (info.shopName || "店").slice(0, 1);
+    document.title = `StudioA 門市預約管理 — ${info.shopName || ""}`;
+    setStatus(`已登入：${info.shopName}（${info.userName}）`);
+    loadActivities();
+    ovQuery();   // 啟動時自動載入總覽
+  } catch (e) {
+    $("#login-msg").textContent = e.message;
+  } finally {
+    busy(btn, false, "登入中…", "登入");
+  }
+}
+
+$("#login-btn").addEventListener("click", doLogin);
+$("#login-pwd").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+$("#login-user").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#login-pwd").focus(); });
+$("#relogin").addEventListener("click", () => showLogin());
+
+// ===================== 側欄導覽 ===================== //
+document.querySelectorAll("#nav .item").forEach((el) => {
+  el.addEventListener("click", () => {
+    document.querySelectorAll("#nav .item").forEach((x) => x.classList.remove("active"));
+    el.classList.add("active");
+    document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+    $("#view-" + el.dataset.view).classList.add("active");
+    if (el.dataset.view === "changelog") clReload();
+  });
+});
+
+// ===================== ① 預約總覽 ===================== //
+let ovItems = [];
+$("#ov-start").value = fmtDate(addDays(-180));
+$("#ov-end").value = fmtDate(addDays(180));
+
+async function ovQuery() {
+  const btn = $("#ov-query");
+  busy(btn, true, "讀取中…", "查詢 / 重新整理");
+  setStatus(`讀取預約資料中（${$("#ov-start").value} ～ ${$("#ov-end").value}）…`);
+  try {
+    const data = await apiGet(`/api/reservations?start=${$("#ov-start").value}&end=${$("#ov-end").value}`);
+    ovItems = data.items;
+    const s = data.stats;
+    const set = (id, v) => $(id).textContent = (v === undefined || v === null) ? "—" : v;
+    set("#c-total", s.totalCount ?? 0); set("#c-reserved", s.reservationCount ?? 0);
+    set("#c-alloc", s.allocationCount ?? 0); set("#c-arrival", s.arrivalCount ?? 0);
+    set("#c-hold", s.reserveCount ?? 0); set("#c-pick", s.pickCount ?? 0);
+    set("#c-abandon", s.abandonCount ?? 0); set("#c-cancel", s.cancelCount ?? 0);
+    set("#c-rate", s.pickupRate ?? "—");
+    ovRecompute();
+    setStatus(`完成：共 ${s.totalCount ?? ovItems.length} 筆。`);
+  } catch (e) { setStatus("發生錯誤。"); alert(e.message); }
+  finally { busy(btn, false, "讀取中…", "查詢 / 重新整理"); }
+}
+
+function ovRecompute() {
+  const scope = $("#ov-scope").value;
+  let items = ovItems;
+  if (scope === "reserved") items = ovItems.filter((it) => it.status === 3);
+  else if (scope === "unpicked") items = ovItems.filter((it) => UNPICKED.has(it.status));
+  const cnt = (key) => {
+    const c = {};
+    items.forEach((it) => { const k = it[key] || ""; c[k] = (c[k] || 0) + 1; });
+    return c;
+  };
+  renderRankTable($("#ov-models"), cnt("productName"), "型號");
+  renderRankTable($("#ov-members"), cnt("userClassName"), "會員等級");
+}
+$("#ov-query").addEventListener("click", ovQuery);
+$("#ov-scope").addEventListener("change", ovRecompute);
+
+// ===================== ② 區間查詢 ===================== //
+$("#rg-start").value = fmtDate(addDays(-6));
+$("#rg-end").value = fmtDate(new Date());
+
+document.querySelectorAll("#view-range [data-days]").forEach((b) => {
+  b.addEventListener("click", () => {
+    const days = parseInt(b.dataset.days, 10);
+    const today = new Date();
+    if (days === -1) {
+      $("#rg-start").value = fmtDate(new Date(today.getFullYear(), today.getMonth(), 1));
+    } else {
+      $("#rg-start").value = fmtDate(addDays(-days));
+    }
+    $("#rg-end").value = fmtDate(today);
+    rgQuery();
+  });
+});
+
+async function rgQuery() {
+  const btn = $("#rg-query");
+  busy(btn, true, "查詢中…", "查詢");
+  setStatus("查詢區間預約中…");
+  try {
+    const data = await apiGet(`/api/reservations?start=${$("#rg-start").value}&end=${$("#rg-end").value}`);
+    const total = data.stats.totalCount ?? data.items.length;
+    $("#bignum").textContent = `${total} 筆`;
+    $("#bigsub").textContent = `${$("#rg-start").value} ～ ${$("#rg-end").value} 之間新增的預約`;
+    const sc = {};
+    data.items.forEach((it) => { const k = it.statusName || ""; sc[k] = (sc[k] || 0) + 1; });
+    renderRankTable($("#rg-status"), sc, "狀態");
+    const dc = {};
+    data.items.forEach((it) => {
+      const v = (it.reservationTimeValue || "").trim().replace(/\//g, "-");
+      if (v.length >= 10) { const d = v.slice(0, 10); dc[d] = (dc[d] || 0) + 1; }
+    });
+    const rows = Object.entries(dc).sort();
+    $("#rg-days").innerHTML = `<table><thead><tr><th>日期</th><th style="text-align:right">新增筆數</th></tr></thead><tbody>`
+      + rows.map(([d, c]) => `<tr><td>${esc(d)}</td><td class="num">${c}</td></tr>`).join("") + "</tbody></table>";
+    setStatus(`完成：${total} 筆。`);
+  } catch (e) { setStatus("發生錯誤。"); alert(e.message); }
+  finally { busy(btn, false, "查詢中…", "查詢"); }
+}
+$("#rg-query").addEventListener("click", rgQuery);
+
+// ===================== ③ 狀態管理 ===================== //
+const ST_COLUMNS = [
+  ["orderSNo", "預約單號"],
+  ["statusName", "狀態"],
+  ["subscriberName", "姓名"],
+  ["subscriberContactNumber", "電話"],
+  ["_pickupDeadline", "預計取機時間(已到貨/保留)"],
+  ["productName", "型號"],
+  ["batchNo", "梯次"],
+  ["userClassName", "會員等級"],
+  ["vipId", "會員代碼"],
+  ["reservationTimeValue", "預約時間"],
+  ["shopName", "門市"],
+];
+let stAllItems = [];   // 本次查詢回來的全部
+let stRows = [];       // 套用篩選後顯示中的
+let stCat = "全部";
+let activityMap = {};  // reservationActivityId -> 名稱
+
+function pickupDeadline(it) {
+  const v = it.arrivalEndTime || it.reserveEndTime || it.arrivalEndTimeValue || it.reserveEndTimeValue;
+  return v ? String(v).replace(/\//g, "-").slice(0, 10) : "";
+}
+function productCategory(name) {
+  const s = (name || "").toLowerCase();
+  if (s.includes("airpods")) return "AirPods";
+  if (s.includes("ipad")) return "iPad";
+  if (s.includes("iphone")) return "iPhone";
+  if (s.includes("mac")) return "Mac";
+  return "其他";
+}
+function activityLabel(aid) {
+  if (!aid) return "";
+  return activityMap[aid] || ("活動 " + String(aid).slice(0, 8) + "…");
+}
+async function loadActivities() {
+  try {
+    const lst = await apiGet("/api/activities");
+    activityMap = {};
+    (lst || []).forEach((a) => { if (a.id) activityMap[a.id] = (a.name || "").trim(); });
+    if (stAllItems.length) { stPopulateFilters(stAllItems); stApplyFilters(); }
+  } catch (e) { /* 抓不到活動名稱不影響其他功能 */ }
+}
+
+// 狀態複選框（預設勾「已到貨」「保留」）
+$("#st-statuschecks").innerHTML = CHANGE_STATUS_OPTIONS.map((c) =>
+  `<label class="chk"><input type="checkbox" data-code="${c}" ${c === 5 || c === 6 ? "checked" : ""}> ${STATUS_NAMES[c]}</label>`
+).join(" ");
+// 變更狀態下拉
+$("#st-newstatus").innerHTML = CHANGE_STATUS_OPTIONS.map((c) =>
+  `<option value="${c}">${STATUS_NAMES[c]}${SHOP_CHANGEABLE.includes(c) ? "（門市標準）" : ""}</option>`
+).join("");
+
+$("#st-searchtype").addEventListener("change", () => {
+  $("#st-kw").placeholder = $("#st-searchtype").value === "phone"
+    ? "輸入電話後按 Enter 或「查詢」" : "輸入預約單號後按 Enter 或「查詢」";
+});
+$("#st-kw").addEventListener("keydown", (e) => { if (e.key === "Enter") stSearch(); });
+
+async function stSearch() {
+  const kw = $("#st-kw").value.trim();
+  if (!kw) { alert("請先輸入要查詢的預約單號或電話。"); return; }
+  const btn = $("#st-search");
+  busy(btn, true, "查詢中…", "查詢");
+  const param = $("#st-searchtype").value === "phone" ? `phone=${encodeURIComponent(kw)}` : `orderSno=${encodeURIComponent(kw)}`;
+  setStatus(`查詢 ${kw} …`);
+  try {
+    const data = await apiGet(`/api/reservations?${param}`);
+    stOnRows(data.items);
+  } catch (e) { setStatus("發生錯誤。"); alert(e.message); }
+  finally { busy(btn, false, "查詢中…", "查詢"); }
+}
+$("#st-search").addEventListener("click", stSearch);
+
+async function stQueryByStatus() {
+  const codes = [...document.querySelectorAll("#st-statuschecks input:checked")].map((c) => c.dataset.code);
+  const btn = $("#st-query");
+  busy(btn, true, "查詢中…", "查詢");
+  const names = codes.length ? codes.map((c) => STATUS_NAMES[c]).join("、") : "全部狀態";
+  setStatus(`依狀態查詢（${names}）中…`);
+  try {
+    const data = await apiGet(`/api/reservations?statuses=${codes.join(",")}`);
+    stOnRows(data.items);
+  } catch (e) { setStatus("發生錯誤。"); alert(e.message); }
+  finally { busy(btn, false, "查詢中…", "查詢"); }
+}
+$("#st-query").addEventListener("click", stQueryByStatus);
+
+function stOnRows(items) {
+  stAllItems = items;
+  stPopulateFilters(items);
+  stApplyFilters();
+  setStatus(items.length ? `找到 ${items.length} 筆（可用篩選縮小）。` : "查無資料。");
+}
+
+function stPopulateFilters(items) {
+  const fill = (sel, allLabel, values, labelFn) => {
+    const prev = sel.value;
+    sel.innerHTML = `<option value="">${allLabel}</option>` +
+      values.map((v) => `<option value="${esc(String(v))}">${esc(labelFn ? labelFn(v) : String(v))}</option>`).join("");
+    sel.value = [...sel.options].some((o) => o.value === prev) ? prev : "";
+  };
+  const actIds = [...new Set(items.map((it) => it.reservationActivityId).filter(Boolean))]
+    .sort((a, b) => activityLabel(a).localeCompare(activityLabel(b)));
+  fill($("#st-activity"), "全部活動", actIds, activityLabel);
+  fill($("#st-batch"), "全部梯次", [...new Set(items.map((it) => it.batchNo).filter(Boolean))].sort());
+  fill($("#st-level"), "全部等級", [...new Set(items.map((it) => it.userClassName).filter(Boolean))].sort());
+}
+
+function stApplyFilters() {
+  const act = $("#st-activity").value, bat = $("#st-batch").value, lvl = $("#st-level").value;
+  stRows = stAllItems.filter((it) =>
+    (stCat === "全部" || productCategory(it.productName) === stCat) &&
+    (!act || String(it.reservationActivityId) === act) &&
+    (!bat || String(it.batchNo) === bat) &&
+    (!lvl || String(it.userClassName) === lvl)
+  );
+  stRenderRows(stRows);
+  $("#st-count").textContent = `符合 ${stRows.length} / 共 ${stAllItems.length} 筆`;
+}
+["#st-activity", "#st-batch", "#st-level"].forEach((s) => $(s).addEventListener("change", stApplyFilters));
+document.querySelectorAll("#st-cats .toggle").forEach((b) => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll("#st-cats .toggle").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on");
+    stCat = b.dataset.cat;
+    stApplyFilters();
+  });
+});
+
+function stRenderRows(items) {
+  let html = `<table><thead><tr><th>✓</th>` + ST_COLUMNS.map(([, t]) => `<th>${esc(t)}</th>`).join("") + `</tr></thead><tbody>`;
+  items.forEach((it, i) => {
+    html += `<tr><td style="text-align:center"><input type="checkbox" data-idx="${i}"></td>` +
+      ST_COLUMNS.map(([k]) => {
+        const v = k === "_pickupDeadline" ? pickupDeadline(it) : it[k];
+        return `<td>${esc(v == null ? "" : String(v))}</td>`;
+      }).join("") + "</tr>";
+  });
+  $("#st-table").innerHTML = html + "</tbody></table>";
+}
+
+function stSelectedItems() {
+  return [...document.querySelectorAll("#st-table input:checked")].map((c) => stRows[+c.dataset.idx]).filter(Boolean);
+}
+$("#st-checkall").addEventListener("click", () => document.querySelectorAll("#st-table input[type=checkbox]").forEach((c) => c.checked = true));
+$("#st-uncheckall").addEventListener("click", () => document.querySelectorAll("#st-table input[type=checkbox]").forEach((c) => c.checked = false));
+
+async function stApply() {
+  const selected = stSelectedItems();
+  if (!selected.length) { alert("請先在表格中勾選要變更的單據（可多選）。"); return; }
+  const code = parseInt($("#st-newstatus").value, 10);
+  const ids = selected.map((it) => it.productOrderProductShelfId).filter(Boolean);
+  if (!ids.length) { alert("選取的資料缺少可變更的 ID。"); return; }
+  if (!confirm(`確定要把選取的 ${ids.length} 筆預約狀態改為「${STATUS_NAMES[code]}」嗎？\n此操作會直接更新後台資料。`)) return;
+  const btn = $("#st-apply");
+  busy(btn, true, "送出中…", "送出變更");
+  setStatus("送出狀態變更…");
+  try {
+    const r = await apiPost("/api/update-status", {shelfIds: ids, status: code});
+    alert(r.message);
+    setStatus(r.message);
+    if ($("#st-kw").value.trim()) stSearch(); else stQueryByStatus();
+  } catch (e) { setStatus("發生錯誤。"); alert("變更失敗：" + e.message); }
+  finally { busy(btn, false, "送出中…", "送出變更"); }
+}
+$("#st-apply").addEventListener("click", stApply);
+
+// ---- 列印標籤 ---- //
+function pickLayout() {
+  return new Promise((resolve) => {
+    const dlg = $("#layout-dialog");
+    const onClick = (e) => {
+      const b = e.target.closest("button[data-layout]");
+      if (!b) return;
+      dlg.removeEventListener("click", onClick);
+      dlg.close();
+      resolve(b.dataset.layout || null);
+    };
+    dlg.addEventListener("click", onClick);
+    dlg.showModal();
+  });
+}
+
+async function stPrint() {
+  const selected = stSelectedItems();
+  if (!selected.length) { alert("請先在表格中勾選要列印的單據（可多選）。"); return; }
+  const notArrived = selected.filter((it) => it.status !== 5);
+  if (notArrived.length &&
+      !confirm(`選取的 ${selected.length} 筆中有 ${notArrived.length} 筆不是「已到貨」。\n仍要列印標籤嗎？`)) return;
+  const layout = await pickLayout();
+  if (!layout) return;
+  const records = selected.map((it) => ({
+    "預約單號": it.orderSNo || "",
+    "會員代碼": it.vipId || "",
+    "姓名": it.subscriberName || "",
+    "手機號碼": it.subscriberContactNumber || "",
+    "梯次": it.batchNo || "",
+    "預約產品": it.productName || "",
+    "預計取機時間": pickupDeadline(it),
+  }));
+  const btn = $("#st-print");
+  busy(btn, true, "產生中…", "🖨 列印標籤");
+  setStatus("產生標籤 PDF（首次可能需安裝列印元件）…");
+  try {
+    const blob = await apiPost("/api/labels", {records, layout});
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setStatus(`已產生 ${records.length} 張標籤，已在新分頁開啟，請按 Cmd+P 列印。`);
+  } catch (e) { setStatus("發生錯誤。"); alert("產生標籤失敗：" + e.message); }
+  finally { busy(btn, false, "產生中…", "🖨 列印標籤"); }
+}
+$("#st-print").addEventListener("click", stPrint);
+
+// ===================== ④ 門市遞補 ===================== //
+const FL_COLUMNS = [
+  ["shopName", "門市"],
+  ["statusName", "狀態"],
+  ["userClassName", "會員等級"],
+  ["vipId", "會員代碼"],
+  ["subscriberName", "姓名"],
+  ["subscriberContactNumber", "電話"],
+  ["productName", "預約產品"],
+  ["reservationTimeValue", "預約時間"],
+  ["orderSNo", "預約單號"],
+];
+let flItems = [];
+$("#fl-start").value = fmtDate(addDays(-180));
+$("#fl-end").value = fmtDate(addDays(180));
+
+async function flSearch() {
+  const btn = $("#fl-search");
+  busy(btn, true, "搜索中…", "搜索");
+  setStatus("查詢門市遞補…");
+  try {
+    const data = await apiGet(`/api/fill-list?start=${$("#fl-start").value}&end=${$("#fl-end").value}`);
+    const prods = (data.fillProductShelfEntitys || []).slice().sort((a, b) => (b.number || 0) - (a.number || 0));
+    $("#fl-products").innerHTML = `<table><thead><tr><th>產品</th><th style="text-align:right">可遞補數量</th></tr></thead><tbody>`
+      + prods.map((p) => `<tr><td>${esc(p.productName || "")}</td><td class="num">${p.number || 0}</td></tr>`).join("")
+      + "</tbody></table>";
+    flItems = data.fillListOutDtos || [];
+    let html = `<table><thead><tr><th>✓</th>` + FL_COLUMNS.map(([, t]) => `<th>${esc(t)}</th>`).join("") + `</tr></thead><tbody>`;
+    flItems.forEach((it, i) => {
+      html += `<tr><td style="text-align:center"><input type="checkbox" data-idx="${i}"></td>` +
+        FL_COLUMNS.map(([k]) => `<td>${esc(it[k] == null ? "" : String(it[k]))}</td>`).join("") + "</tr>";
+    });
+    $("#fl-table").innerHTML = html + "</tbody></table>";
+    $("#fl-count").textContent = `可遞補產品 ${prods.length} 種 ・ 候補名單 ${flItems.length} 筆`;
+    setStatus("完成。");
+  } catch (e) { setStatus("發生錯誤。"); alert(e.message); }
+  finally { busy(btn, false, "搜索中…", "搜索"); }
+}
+$("#fl-search").addEventListener("click", flSearch);
+$("#fl-checkall").addEventListener("click", () => document.querySelectorAll("#fl-table input[type=checkbox]").forEach((c) => c.checked = true));
+$("#fl-uncheckall").addEventListener("click", () => document.querySelectorAll("#fl-table input[type=checkbox]").forEach((c) => c.checked = false));
+
+async function flFill() {
+  const selected = [...document.querySelectorAll("#fl-table input:checked")].map((c) => flItems[+c.dataset.idx]).filter(Boolean);
+  if (!selected.length) { alert("請先在候補名單勾選要遞補的單據（可多選）。"); return; }
+  let preview = selected.slice(0, 6).map((it) => it.subscriberName || "?").join("、");
+  if (selected.length > 6) preview += " …";
+  if (!confirm(`確定要把勾選的這 ${selected.length} 筆候補遞補進去嗎？\n\n${preview}\n\n此動作會更新後台、無法在此復原。`)) return;
+  const ids = selected.map((it) => it.productOrderProductShelfId).filter(Boolean);
+  const btn = $("#fl-fill");
+  busy(btn, true, "遞補中…", "🔁 遞補選取");
+  setStatus("送出遞補…");
+  try {
+    const r = await apiPost("/api/fill", {shelfIds: ids});
+    alert(r.message);
+    setStatus(r.message);
+    flSearch();
+  } catch (e) { setStatus("發生錯誤。"); alert(e.message); }
+  finally { busy(btn, false, "遞補中…", "🔁 遞補選取"); }
+}
+$("#fl-fill").addEventListener("click", flFill);
+
+// ===================== ⑤ 變更紀錄 ===================== //
+$("#cl-filter").innerHTML = `<option value="">全部</option>` +
+  CHANGE_STATUS_OPTIONS.map((c) => `<option value="${STATUS_NAMES[c]}">${STATUS_NAMES[c]}</option>`).join("");
+
+async function clReload() {
+  try {
+    let rows = await apiGet("/api/changelog");
+    rows = rows.slice().reverse();  // 最新在上
+    const flt = $("#cl-filter").value;
+    if (flt) rows = rows.filter((r) => (r.newStatusName || "").includes(flt));
+    const cols = ["detectedAt", "orderSNo", "subscriberName", "productName", "oldStatusName", "newStatusName"];
+    const titles = ["偵測時間", "預約單號", "姓名", "型號", "原狀態", "新狀態"];
+    $("#cl-table").innerHTML = `<table><thead><tr>` + titles.map((t) => `<th>${esc(t)}</th>`).join("") + `</tr></thead><tbody>`
+      + rows.map((r) => `<tr>` + cols.map((k) => `<td>${esc(r[k] == null ? "" : String(r[k]))}</td>`).join("") + "</tr>").join("")
+      + "</tbody></table>";
+    $("#cl-count").textContent = `共 ${rows.length} 筆變更`;
+  } catch (e) { alert(e.message); }
+}
+$("#cl-refresh").addEventListener("click", clReload);
+$("#cl-filter").addEventListener("change", clReload);
+
+// ===================== 啟動 ===================== //
+(async function init() {
+  try {
+    const s = await apiGet("/api/session");
+    $("#login-ver").textContent = `版本 v${s.version}`;
+  } catch (e) { /* 伺服器沒回也照常顯示登入 */ }
+  const saved = localStorage.getItem("studioa_username") || "";
+  $("#login-user").value = saved;
+  $("#login-remember").checked = !!saved;
+  showLogin();
+})();
+</script>
+</body>
+</html>
