@@ -1117,6 +1117,117 @@ class ChangeLogTab(QWidget):
 
 
 # ====================================================================== #
+# 分頁 5：門市遞補（唯讀檢視，比照後台「門市遞補」頁）
+# ====================================================================== #
+FILL_COLUMNS = [
+    ("shopName", "門市"),
+    ("statusName", "狀態"),
+    ("userClassName", "會員等級"),
+    ("vipId", "會員代碼"),
+    ("subscriberName", "姓名"),
+    ("subscriberContactNumber", "電話"),
+    ("productName", "預約產品"),
+    ("reservationTimeValue", "預約時間"),
+    ("orderSNo", "預約單號"),
+]
+
+
+class FillTab(QWidget):
+    def __init__(self, api: StudioAClient, mw: "MainWindow"):
+        super().__init__()
+        self.api = api
+        self.mw = mw
+        root = QVBoxLayout(self)
+
+        bar = QHBoxLayout()
+        bar.addWidget(QLabel("預約日期區間："))
+        self.start_date = QDateEdit(QDate.currentDate().addDays(-180))
+        self.end_date = QDateEdit(QDate.currentDate().addDays(180))
+        for de in (self.start_date, self.end_date):
+            de.setCalendarPopup(True)
+            de.setDisplayFormat("yyyy-MM-dd")
+        bar.addWidget(self.start_date)
+        bar.addWidget(QLabel("～"))
+        bar.addWidget(self.end_date)
+        self.search_btn = QPushButton("搜索")
+        self.search_btn.setObjectName("primary")
+        self.search_btn.clicked.connect(self.search)
+        bar.addWidget(self.search_btn)
+        bar.addStretch()
+        self.count_label = QLabel("—")
+        self.count_label.setStyleSheet("color:#2f6bf0;font-weight:bold;")
+        bar.addWidget(self.count_label)
+        root.addLayout(bar)
+
+        sumbox = QGroupBox("可遞補產品")
+        sv = QVBoxLayout(sumbox)
+        self.sum_table = QTableWidget()
+        self.sum_table.setColumnCount(2)
+        self.sum_table.setHorizontalHeaderLabels(["產品", "可遞補數量"])
+        self.sum_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.sum_table.verticalHeader().setVisible(False)
+        sv.addWidget(self.sum_table)
+        root.addWidget(sumbox, 2)
+
+        listbox = QGroupBox("候補名單")
+        lv = QVBoxLayout(listbox)
+        self.list_table = QTableWidget()
+        self.list_table.setColumnCount(len(FILL_COLUMNS))
+        self.list_table.setHorizontalHeaderLabels([c[1] for c in FILL_COLUMNS])
+        self.list_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.list_table.setSortingEnabled(True)
+        lv.addWidget(self.list_table)
+        root.addWidget(listbox, 3)
+
+    def search(self):
+        start = qdate_to_start(self.start_date.date())
+        end = qdate_to_end(self.end_date.date())
+        self.search_btn.setEnabled(False)
+        self.search_btn.setText("搜索中…")
+        self.mw.status("查詢門市遞補…")
+
+        def task():
+            return self.api.fetch_fill_list(start, end)
+
+        def ok(data):
+            self.search_btn.setEnabled(True)
+            self.search_btn.setText("搜索")
+            self._render(data)
+            self.mw.status("完成。")
+
+        def fail(err):
+            self.search_btn.setEnabled(True)
+            self.search_btn.setText("搜索")
+            self.mw.handle_error(err)
+
+        run_async(self, task, ok, fail)
+
+    def _render(self, data: dict):
+        prods = sorted(data.get("fillProductShelfEntitys", []) or [],
+                       key=lambda p: -(p.get("number") or 0))
+        self.sum_table.setRowCount(len(prods))
+        for i, p in enumerate(prods):
+            self.sum_table.setItem(i, 0, QTableWidgetItem(str(p.get("productName") or "")))
+            c = QTableWidgetItem()
+            c.setData(Qt.DisplayRole, int(p.get("number") or 0))
+            c.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.sum_table.setItem(i, 1, c)
+        self.sum_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.sum_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+
+        rows = data.get("fillListOutDtos", []) or []
+        self.list_table.setSortingEnabled(False)
+        self.list_table.setRowCount(len(rows))
+        for i, it in enumerate(rows):
+            for c, (key, _t) in enumerate(FILL_COLUMNS):
+                val = it.get(key)
+                self.list_table.setItem(i, c, QTableWidgetItem("" if val is None else str(val)))
+        self.list_table.setSortingEnabled(True)
+        self.list_table.resizeColumnsToContents()
+        self.count_label.setText(f"可遞補產品 {len(prods)} 種 ・ 候補名單 {len(rows)} 筆")
+
+
+# ====================================================================== #
 # 主視窗
 # ====================================================================== #
 class MainWindow(QMainWindow):
@@ -1165,7 +1276,7 @@ class MainWindow(QMainWindow):
 
         self.nav = QListWidget()
         self.nav.setObjectName("nav")
-        for name in ["預約總覽", "區間查詢", "狀態管理", "變更紀錄"]:
+        for name in ["預約總覽", "區間查詢", "狀態管理", "門市遞補", "變更紀錄"]:
             QListWidgetItem(name, self.nav)
         sv.addWidget(self.nav, 1)
 
@@ -1193,8 +1304,9 @@ class MainWindow(QMainWindow):
         self.overview = OverviewTab(api, self)
         self.range = RangeTab(api, self)
         self.status_tab = StatusTab(api, self)
+        self.fill_tab = FillTab(api, self)
         self.changelog_tab = ChangeLogTab(self)
-        for w in (self.overview, self.range, self.status_tab, self.changelog_tab):
+        for w in (self.overview, self.range, self.status_tab, self.fill_tab, self.changelog_tab):
             self.stack.addWidget(w)
 
         content = QWidget()

@@ -27,6 +27,7 @@ EP_VALID = f"{BASE}/shopcms/admin-user-login/valid-token"
 EP_LIST = f"{BASE}/shopcms/reservation-activity/reservation-user-list"
 EP_UPDATE_STATUS = f"{BASE}/shopcms/reservation-activity/reservation-status"
 EP_ACTIVITIES = f"{BASE}/shopcms/reservation-activity/dropdown-list"
+EP_FILL_LIST = f"{BASE}/shopcms/reservation-activity/fill-list"
 
 # 狀態代碼對照（見 api_notes.md）
 STATUS_CODE_TO_NAME: dict[int, str] = {
@@ -258,6 +259,23 @@ class StudioAClient:
         """
         data = self._request("GET", EP_ACTIVITIES)
         return data if isinstance(data, list) else []
+
+    def fetch_fill_list(self, start_time, end_time, *,
+                        delivery_method: int = DELIVERY_METHOD_STORE_PICKUP) -> dict:
+        """門市遞補：取得「可遞補產品摘要」+「候補名單」。
+
+        回傳 dict：
+          totalCount,
+          fillProductShelfEntitys: [{'productName':..., 'number': 可遞補數量}, ...],
+          fillListOutDtos: [候補單，欄位類似預約單（orderSNo/subscriberName/...）],
+        """
+        params = {
+            "DeliveryMethod": delivery_method,
+            "StartTime": _fmt_time(start_time),
+            "EndTime": _fmt_time(end_time),
+        }
+        data = self._request("GET", EP_FILL_LIST, params=params)
+        return data if isinstance(data, dict) else {}
 
     def find_by_order_sno(self, order_sno: str) -> list[dict]:
         """用預約單號查單。回傳符合的明細清單（通常 1 筆）。
