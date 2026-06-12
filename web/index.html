@@ -972,9 +972,9 @@ async function loadActivities() {
   } catch (e) { /* 抓不到活動名稱不影響其他功能 */ }
 }
 
-// 狀態複選（chip 樣式；預設勾「已到貨」「保留」）
+// 狀態複選（chip 樣式；預設不勾選，由使用者自行挑選；都不勾＝查全部狀態）
 $("#st-statuschecks").innerHTML = CHANGE_STATUS_OPTIONS.map((c) =>
-  `<button class="chip${c === 5 || c === 6 ? " on" : ""}" data-code="${c}">${STATUS_NAMES[c]}</button>`
+  `<button class="chip" data-code="${c}">${STATUS_NAMES[c]}</button>`
 ).join("");
 $("#st-statuschecks").addEventListener("click", (e) => {
   const b = e.target.closest(".chip");
