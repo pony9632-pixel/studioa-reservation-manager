@@ -521,9 +521,16 @@ class RangeTab(QWidget):
 # 分頁 3：狀態管理（查單 + 改狀態）
 # ====================================================================== #
 def pickup_deadline(it: dict) -> str:
-    """預計取機時間：已到貨用 arrivalEndTime、保留用 reserveEndTime，只取日期。"""
-    v = (it.get("arrivalEndTime") or it.get("reserveEndTime")
-         or it.get("arrivalEndTimeValue") or it.get("reserveEndTimeValue"))
+    """預計取機時間，只取日期。依狀態決定看哪個欄位：
+    保留(6)優先用 reserveEndTime（改保留後後台會延長此日期，
+    但舊的 arrivalEndTime 仍留在資料上，不能先看它）；其他狀態優先用 arrivalEndTime。
+    """
+    if it.get("status") == 6:  # 保留
+        v = (it.get("reserveEndTime") or it.get("reserveEndTimeValue")
+             or it.get("arrivalEndTime") or it.get("arrivalEndTimeValue"))
+    else:
+        v = (it.get("arrivalEndTime") or it.get("arrivalEndTimeValue")
+             or it.get("reserveEndTime") or it.get("reserveEndTimeValue"))
     if not v:
         return ""
     return str(v).replace("/", "-")[:10]

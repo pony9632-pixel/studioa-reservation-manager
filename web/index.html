@@ -948,7 +948,11 @@ let activityMap = {};  // reservationActivityId -> 名稱
 
 const rowKey = (it) => it.productOrderProductShelfId || it.orderSNo || "";
 function pickupDeadline(it) {
-  const v = it.arrivalEndTime || it.reserveEndTime || it.arrivalEndTimeValue || it.reserveEndTimeValue;
+  // 保留(6)優先看 reserveEndTime（改保留後後台延長的是這個日期，
+  // 舊的 arrivalEndTime 仍留在資料上）；其他狀態優先看 arrivalEndTime
+  const v = it.status === 6
+    ? (it.reserveEndTime || it.reserveEndTimeValue || it.arrivalEndTime || it.arrivalEndTimeValue)
+    : (it.arrivalEndTime || it.arrivalEndTimeValue || it.reserveEndTime || it.reserveEndTimeValue);
   return v ? String(v).replace(/\//g, "-").slice(0, 10) : "";
 }
 function productCategory(name) {
