@@ -31,7 +31,21 @@ python3 web_app.py
 
 或直接雙擊 `StudioA預約管理-網頁版.command`。會在本機啟動一個小伺服器並自動開瀏覽器（`http://127.0.0.1:8765/`），介面（`web/index.html`）與功能跟桌面版相同，但**不需要安裝 PySide6**，只要有 `requests` 就能跑。
 
-> 為什麼不能把 HTML 直接放上 GitHub Pages 用？因為後台 API 沒有開放瀏覽器跨網域存取（CORS），瀏覽器會擋掉從其他網域直接打 `studioa.com.tw` 的請求，所以需要這個本機小伺服器代轉。
+> 為什麼不能把 HTML 直接放上 GitHub Pages 用？因為後台 API 沒有開放瀏覽器跨網域存取（CORS），瀏覽器會擋掉從其他網域直接打 `studioa.com.tw` 的請求，所以需要這個小伺服器代轉。
+
+### 雲端部署（給同事一個網址直接用）
+
+repo 內附 `Dockerfile` 與 `render.yaml`，可部署到 [Render](https://render.com)（免費方案即可，自動 HTTPS）：
+
+1. 用 GitHub 帳號登入 Render → **New → Blueprint** → 選這個 repo → Apply。
+2. 部署完成後會得到 `https://studioa-reservation-manager.onrender.com` 之類的網址，傳給同事即可。
+3. 每位同事用自己的後台帳密登入，session 各自獨立（閒置 12 小時後需重新登入）。
+
+注意事項：
+- 免費方案閒置 15 分鐘會休眠，下一個人開啟要等約 30～60 秒喚醒。
+- 設定環境變數 `PORT` 即進入伺服器模式（Render 會自動設定）：聽 `0.0.0.0`、不開瀏覽器、不跑自動更新（改版直接 push GitHub 會自動重新部署）。
+- 「變更紀錄」存在伺服器上、按門市分開；免費方案重新部署後會清空。
+- 工具會經手客戶個資，網址請只給內部同事，勿公開張貼。
 
 ### 桌面版（PySide6）
 

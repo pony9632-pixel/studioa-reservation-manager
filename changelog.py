@@ -23,9 +23,17 @@ KEY = "productOrderProductShelfId"
 MAX_CHANGES = 10000  # 上限，避免無限成長
 
 
-def _load() -> dict:
+def _path(shop: str | None) -> Path:
+    """shop=None 用預設檔（桌面版單店）；多人網頁版按門市分檔，避免互相混在一起。"""
+    if not shop:
+        return PATH
+    safe = "".join(ch for ch in shop if ch.isalnum())[:40] or "shop"
+    return Path.home() / f".studioa_reservation_changelog_{safe}.json"
+
+
+def _load(shop: str | None = None) -> dict:
     try:
-        data = json.loads(PATH.read_text(encoding="utf-8"))
+        data = json.loads(_path(shop).read_text(encoding="utf-8"))
         data.setdefault("snapshot", {})
         data.setdefault("changes", [])
         return data
@@ -33,18 +41,18 @@ def _load() -> dict:
         return {"snapshot": {}, "changes": []}
 
 
-def _save(data: dict):
+def _save(data: dict, shop: str | None = None):
     try:
-        PATH.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        _path(shop).write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     except Exception:
         pass
 
 
-def record(items: list) -> int:
+def record(items: list, shop: str | None = None) -> int:
     """比對 items 與上次快照，記錄狀態變更。回傳新偵測到的變更數。"""
     if not items:
         return 0
-    data = _load()
+    data = _load(shop)
     snap = data["snapshot"]
     changes = data["changes"]
     now = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -73,10 +81,10 @@ def record(items: list) -> int:
         del changes[: len(changes) - MAX_CHANGES]
     data["snapshot"] = snap
     data["changes"] = changes
-    _save(data)
+    _save(data, shop)
     return new_count
 
 
-def all_changes() -> list:
+def all_changes(shop: str | None = None) -> list:
     """回傳所有已記錄的變更（舊→新順序）。"""
-    return _load().get("changes", [])
+    return _load(shop).get("changes", [])
