@@ -1,4 +1,4 @@
-# StudioA 門市預約管理（桌面程式）
+# StudioA 門市預約管理（桌面程式＋網頁版）
 
 介接 StudioA 門市預約後台（`shopcms`）的小工具，提供五個分頁：
 
@@ -22,6 +22,18 @@ python3 -m pip install -r requirements.txt
 ```
 
 ## 二、執行
+
+### 網頁版（HTML 介面，建議）
+
+```bash
+python3 web_app.py
+```
+
+或直接雙擊 `StudioA預約管理-網頁版.command`。會在本機啟動一個小伺服器並自動開瀏覽器（`http://127.0.0.1:8765/`），介面（`web/index.html`）與功能跟桌面版相同，但**不需要安裝 PySide6**，只要有 `requests` 就能跑。
+
+> 為什麼不能把 HTML 直接放上 GitHub Pages 用？因為後台 API 沒有開放瀏覽器跨網域存取（CORS），瀏覽器會擋掉從其他網域直接打 `studioa.com.tw` 的請求，所以需要這個本機小伺服器代轉。
+
+### 桌面版（PySide6）
 
 ```bash
 python3 app.py

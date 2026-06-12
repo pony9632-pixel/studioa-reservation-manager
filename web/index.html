@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudioA 門市預約管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ===================================================================
+   StudioA 預約管理 — 樣式（沉穩商務版型，移植自設計原型）
+   =================================================================== */
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: "Noto Sans TC", -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+:root {
+  --blue: #2f6bf0;
+  --blue-press: #2356cc;
+  --ink: #20283a;
+  --muted: #79839a;
+  --line: #e9edf4;
+  --bg: #f4f6fa;
+  --card: #ffffff;
+  --side: #1c2540;
+  --side-ink: #b9c2db;
+  --side-mute: #6b769b;
+  --side-section: #5e6b8e;
+  --side-hover: rgba(255,255,255,.06);
+  --row-h: 13px;
+  --card-pad: 16px;
+}
+
+.proto {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: row;
+  background: var(--bg); color: var(--ink);
+  overflow: hidden;
+}
+
+table { border-collapse: collapse; width: 100%; }
+
+/* ---------------- 側邊欄 ---------------- */
+.sidebar {
+  width: 248px; flex: 0 0 248px; background: var(--side);
+  display: flex; flex-direction: column; padding: 22px 16px; gap: 4px;
+}
+.brand { display: flex; align-items: center; gap: 11px; padding: 4px 10px 20px; }
+.brand .logo { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(140deg,#4f8bff,#2f6bf0); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 18px; box-shadow: 0 4px 12px rgba(47,107,240,.35); }
+.brand .bt { color: #fff; font-size: 15px; font-weight: 700; line-height: 1.25; }
+.brand .bs { color: var(--side-mute); font-size: 11.5px; }
+.nav-section { color: var(--side-section); font-size: 11px; font-weight: 700; letter-spacing: .1em; padding: 16px 12px 6px; }
+.navitem { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; color: var(--side-ink); font-size: 14.5px; font-weight: 500; cursor: pointer; transition: background .15s, color .15s; border: none; background: none; width: 100%; text-align: left; font-family: inherit; }
+.navitem svg { width: 19px; height: 19px; flex: 0 0 19px; }
+.navitem .count { margin-left: auto; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,.1); color: var(--side-ink); padding: 2px 8px; border-radius: 20px; }
+.navitem.active { background: var(--blue); color: #fff; box-shadow: 0 6px 16px rgba(47,107,240,.4); }
+.navitem.active .count { background: rgba(255,255,255,.22); color: #fff; }
+.navitem:not(.active):hover { background: var(--side-hover); color: #fff; }
+.sidefoot { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: var(--side-hover); }
+.sidefoot .av { width: 34px; height: 34px; border-radius: 50%; background: #46568a; color: #cdd8f5; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; }
+.sidefoot .nm { font-size: 13.5px; font-weight: 600; color: #e7ebf6; }
+.sidefoot .rl { color: var(--side-mute); font-size: 11.5px; }
+.sidefoot .relogin { margin-left: auto; color: var(--side-mute); font-size: 11.5px; cursor: pointer; text-decoration: underline; background: none; border: none; font-family: inherit; padding: 0; }
+.sidefoot .relogin:hover { color: #fff; }
+
+/* ---------------- 主區 ---------------- */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.topbar { min-height: 70px; flex: 0 0 auto; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 12px 28px; gap: 16px; }
+.topbar .ptitle { font-size: 20px; font-weight: 700; white-space: nowrap; }
+.topbar > div:first-child { flex: 0 0 auto; }
+.topbar .psub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.topbar .right { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.iconbtn { width: 40px; height: 40px; border-radius: 11px; border: 1px solid var(--line); background: #fff; color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.iconbtn svg { width: 18px; height: 18px; }
+.iconbtn:hover { background: #f6f8fc; color: var(--ink); }
+
+.content { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 24px 28px 32px; display: flex; flex-direction: column; gap: 18px; }
+.content::-webkit-scrollbar { width: 10px; }
+.content::-webkit-scrollbar-thumb { background: #d8deea; border-radius: 6px; border: 3px solid var(--bg); }
+.view { display: none; flex-direction: column; gap: 18px; }
+.view.active { display: flex; }
+
+/* ---------------- 共用控制元件 ---------------- */
+.pill { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; background: #fff; border: 1px solid var(--line); border-radius: 11px; font-size: 13.5px; color: var(--ink); cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
+.pill svg { width: 15px; height: 15px; color: var(--muted); flex: 0 0 15px; }
+.pill:hover { border-color: #cdd6e6; }
+.pill input[type=date] { border: none; outline: none; background: transparent; font-family: inherit; font-size: 13.5px; color: var(--ink); padding: 0; width: 118px; }
+.tilde { color: var(--muted); }
+.btn-primary { height: 40px; padding: 0 18px; border: none; border-radius: 11px; background: var(--blue); color: #fff; font-size: 13.5px; font-weight: 600; box-shadow: 0 4px 12px rgba(47,107,240,.28); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: background .15s; font-family: inherit; }
+.btn-primary svg { width: 16px; height: 16px; }
+.btn-primary:hover { background: var(--blue-press); }
+.btn-primary:disabled { background: #c2cbdc; box-shadow: none; cursor: not-allowed; }
+.btn-ghost { height: 40px; padding: 0 15px; border: 1px solid var(--line); border-radius: 11px; background: #fff; color: #4b5566; font-size: 13.5px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font-family: inherit; }
+.btn-ghost svg { width: 16px; height: 16px; color: var(--muted); }
+.btn-ghost:hover { background: #f6f8fc; }
+.btn-ghost:disabled { color: #b6bfce; cursor: not-allowed; }
+
+/* ---------------- 統計卡 ---------------- */
+.cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 15px; padding: var(--card-pad); display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 3px rgba(20,30,50,.04); }
+.card .ico { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.card .ico svg { width: 19px; height: 19px; }
+.card .clabel { font-size: 12.5px; color: var(--muted); }
+.card .cval { font-size: 27px; font-weight: 700; letter-spacing: -.01em; }
+.card.hl { background: linear-gradient(140deg, #4f82f3, var(--blue)); border: none; box-shadow: 0 10px 22px rgba(47,107,240,.32); }
+.card.hl .clabel { color: #dbe6ff; }
+.card.hl .cval { color: #fff; }
+.card.hl .ico { background: rgba(255,255,255,.2); color: #fff; }
+.i-blue { background: #e7efff; color: #2f6bf0; }
+.i-green { background: #e4f6ec; color: #1a9e5e; }
+.i-amber { background: #fef0db; color: #d98324; }
+.i-teal { background: #e0f4f4; color: #0d9aa0; }
+.i-rose { background: #fde9e9; color: #d6453d; }
+.i-slate { background: #eef1f6; color: #5b6577; }
+.i-violet { background: #efe9fc; color: #7b54d6; }
+@media (max-width: 1100px) { .cards { grid-template-columns: repeat(3, 1fr); } }
+
+/* ---------------- 面板（型號 / 會員 / 區間） ---------------- */
+.tables { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; align-items: start; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 15px; display: flex; flex-direction: column; overflow: hidden; }
+.panel .phead { padding: 16px 18px; font-size: 15px; font-weight: 700; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.panel .phead > span:first-child { white-space: nowrap; flex: 0 0 auto; }
+.scope-seg { display: inline-flex; background: #eef1f7; border-radius: 9px; padding: 3px; flex: 0 0 auto; }
+.scope-seg button { padding: 6px 10px; font-size: 12px; color: var(--muted); border-radius: 7px; border: none; background: none; cursor: pointer; font-weight: 500; white-space: nowrap; font-family: inherit; }
+.scope-seg button.on { background: #fff; color: var(--blue); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.07); }
+.panel .pbody { padding: 6px 6px 10px; max-height: 52vh; overflow-y: auto; }
+.zrow { display: flex; align-items: center; padding: 10px 14px; font-size: 13.5px; border-radius: 9px; }
+.zrow:hover { background: #f6f9ff; }
+.zrow .rank { width: 22px; height: 22px; border-radius: 7px; background: #eef2ff; color: var(--blue); font-size: 11.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-right: 11px; flex: 0 0 22px; }
+.zrow .rname { flex: 1; color: #34405a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zrow .bar { width: 96px; height: 7px; border-radius: 4px; background: #e9f0ff; margin: 0 13px; overflow: hidden; flex: 0 0 96px; }
+.zrow .bar i { display: block; height: 100%; background: linear-gradient(90deg,#5b86ff,var(--blue)); border-radius: 4px; transition: width .4s cubic-bezier(.2,.7,.3,1); }
+.zrow .rcount { font-size: 14px; font-weight: 700; width: 42px; text-align: right; color: var(--ink); flex: 0 0 42px; }
+.pempty { padding: 30px; text-align: center; color: var(--muted); font-size: 13.5px; }
+
+/* ---------------- 區間查詢 ---------------- */
+.quickrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.qbtn { height: 40px; padding: 0 16px; border-radius: 11px; border: 1px solid var(--line); background: #fff; color: #4b5566; font-size: 13.5px; font-weight: 500; cursor: pointer; font-family: inherit; }
+.qbtn.on { background: var(--blue); color: #fff; border-color: var(--blue); font-weight: 600; box-shadow: 0 4px 12px rgba(47,107,240,.28); }
+.bignum { background: linear-gradient(140deg, #4f82f3, var(--blue)); color: #fff; border-radius: 16px; padding: 24px 26px; display: flex; align-items: flex-end; justify-content: space-between; box-shadow: 0 10px 24px rgba(47,107,240,.3); }
+.bignum .lbl { font-size: 14px; color: #dbe6ff; margin-bottom: 8px; }
+.bignum .v { font-size: 48px; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+.bignum .rng { font-size: 13px; color: #cdddff; }
+.intgrid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 18px; align-items: start; }
+.statline { display: flex; align-items: center; padding: 12px 16px; font-size: 13.5px; border-radius: 10px; }
+.statline:hover { background: #f6f9ff; }
+.statline .vv { font-weight: 700; font-size: 15px; }
+.statline .bar { width: 90px; height: 7px; border-radius: 4px; background: #e9f0ff; overflow: hidden; margin-right: 14px; }
+.statline .bar i { display: block; height: 100%; background: linear-gradient(90deg,#5b86ff,var(--blue)); border-radius: 4px; }
+.chart { display: flex; align-items: flex-end; gap: 10px; height: 200px; padding: 26px 20px 8px; overflow-x: auto; }
+.chart .colwrap { flex: 1; min-width: 22px; display: flex; flex-direction: column; align-items: center; gap: 8px; height: 100%; justify-content: flex-end; }
+.chart .col { width: 100%; max-width: 26px; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg,#6a8cff,var(--blue)); transition: height .5s cubic-bezier(.2,.7,.3,1); position: relative; }
+.chart .col .cv { position: absolute; top: -19px; left: 0; right: 0; text-align: center; font-size: 11px; font-weight: 700; color: var(--ink); }
+.chart .dl { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* ---------------- 篩選卡 + 表格 ---------------- */
+.filtcard { background: var(--card); border: 1px solid var(--line); border-radius: 15px; padding: 16px 18px; display: flex; flex-direction: column; gap: 13px; }
+.searchrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.search { flex: 1; min-width: 220px; max-width: 380px; height: 40px; display: flex; align-items: center; gap: 9px; background: #f5f7fb; border: 1px solid var(--line); border-radius: 11px; padding: 0 14px; }
+.search svg { width: 16px; height: 16px; color: var(--muted); flex: 0 0 16px; }
+.search input { border: none; outline: none; background: transparent; font-size: 13.5px; color: var(--ink); width: 100%; font-family: inherit; }
+.search input::placeholder { color: var(--muted); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.chip { padding: 8px 15px; font-size: 13px; border-radius: 10px; background: #f5f7fb; border: 1px solid var(--line); color: #4b5566; cursor: pointer; font-weight: 500; font-family: inherit; }
+.chip.on { background: var(--blue); color: #fff; border-color: var(--blue); font-weight: 600; }
+.dropdowns { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.flabel { font-size: 12.5px; color: var(--muted); }
+.matchcount { margin-left: auto; font-size: 13px; color: var(--blue); font-weight: 600; background: #e9f0ff; padding: 7px 13px; border-radius: 20px; white-space: nowrap; }
+
+.tablewrap { background: var(--card); border: 1px solid var(--line); border-radius: 15px; overflow: hidden; }
+.tablescroll { overflow: auto; max-height: 52vh; }
+thead th { font-size: 12px; color: var(--muted); font-weight: 600; text-align: left; padding: 13px 14px; background: #f8fafd; border-bottom: 1px solid var(--line); white-space: nowrap; position: sticky; top: 0; z-index: 1; }
+tbody td { font-size: 13px; padding: var(--row-h) 14px; border-bottom: 1px solid var(--line); color: #34405a; white-space: nowrap; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr { cursor: pointer; transition: background .12s; }
+tbody tr:hover { background: #f6f9ff; }
+tbody tr.sel { background: #eef4ff; }
+tbody tr.sel:hover { background: #e6efff; }
+th.cb, td.cb { width: 46px; text-align: center; padding-left: 16px; }
+.chk { width: 19px; height: 19px; border-radius: 6px; border: 1.5px solid #c6cedd; display: inline-block; vertical-align: middle; cursor: pointer; background: #fff; transition: all .12s; position: relative; }
+.chk.on { background: var(--blue); border-color: var(--blue); }
+.chk.on::after { content: ""; position: absolute; left: 5.5px; top: 2px; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.chk.partial { background: var(--blue); border-color: var(--blue); }
+.chk.partial::after { content: ""; position: absolute; left: 4px; top: 8px; width: 9px; height: 0; border-top: 2px solid #fff; }
+.emptyrow td { text-align: center; color: var(--muted); padding: 40px; font-size: 14px; cursor: default; }
+
+/* 狀態徽章 */
+.badge { display: inline-block; padding: 4px 11px; border-radius: 20px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.s-arrival { background: #e6f7ee; color: #1a9e5e; }
+.s-hold    { background: #fff3e0; color: #d98324; }
+.s-alloc   { background: #e9f1ff; color: #2563eb; }
+.s-reserved{ background: #eef0f6; color: #5b6577; }
+.s-pick    { background: #e3f6f6; color: #0d9aa0; }
+.s-abandon { background: #fdeaea; color: #d6453d; }
+.s-cancel  { background: #fdeaea; color: #d6453d; }
+
+/* 動作列 */
+.actionbar { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 15px; padding: 12px 16px; flex-wrap: wrap; }
+.actionbar .lbl { font-size: 13.5px; color: var(--muted); }
+.actionbar .lbl b { color: var(--blue); }
+.actionbar .sep { width: 1px; height: 24px; background: var(--line); margin: 0 4px; }
+.actionbar .sel-status { display: inline-flex; align-items: center; gap: 8px; }
+.selout { height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 11px; background: #fff; font-size: 13.5px; color: var(--ink); font-family: inherit; cursor: pointer; }
+.actionbar .spacer { flex: 1; }
+
+/* ---------------- 變更紀錄 timeline ---------------- */
+.timeline { background: var(--card); border: 1px solid var(--line); border-radius: 15px; padding: 8px 0; }
+.tl-item { display: flex; gap: 16px; padding: 14px 22px; position: relative; }
+.tl-item:not(:last-child)::before { content: ""; position: absolute; left: 33px; top: 40px; bottom: -14px; width: 2px; background: var(--line); }
+.tl-dot { width: 24px; height: 24px; border-radius: 50%; flex: 0 0 24px; display: flex; align-items: center; justify-content: center; margin-top: 2px; z-index: 1; }
+.tl-dot svg { width: 13px; height: 13px; }
+.tl-main { flex: 1; min-width: 0; }
+.tl-row1 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tl-name { font-size: 14.5px; font-weight: 600; color: var(--ink); }
+.tl-sno { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tl-change { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; margin-top: 6px; }
+.tl-change svg { width: 15px; height: 15px; color: var(--muted); }
+.tl-meta { margin-left: auto; text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.tl-meta .prod { display: block; margin-top: 3px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.tl-empty { padding: 40px; text-align: center; color: var(--muted); font-size: 14px; }
+.histnote { font-size: 12.5px; color: var(--muted); line-height: 1.6; background: var(--card); border: 1px solid var(--line); border-radius: 13px; padding: 12px 16px; }
+
+/* ---------------- Modal ---------------- */
+.overlay { position: fixed; inset: 0; background: rgba(20,28,46,.42); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fade .18s ease; }
+.overlay[hidden] { display: none; }
+@keyframes fade { from { opacity: 0; } }
+.modal { background: #fff; border-radius: 18px; width: 460px; max-width: calc(100vw - 48px); box-shadow: 0 24px 60px rgba(20,28,46,.35); overflow: hidden; animation: pop .22s cubic-bezier(.2,.8,.3,1); }
+@keyframes pop { from { transform: translateY(12px) scale(.97); opacity: 0; } }
+.modal .mhead { padding: 22px 24px 0; }
+.modal .mtitle { font-size: 18px; font-weight: 700; }
+.modal .mbody { padding: 14px 24px 20px; font-size: 14px; color: #4b5566; line-height: 1.6; }
+.modal .mbody .hint { background: #fef6e7; color: #a86a16; padding: 11px 14px; border-radius: 11px; font-size: 13px; margin-top: 14px; display: flex; gap: 9px; }
+.modal .mbody .hint svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.modal .mlist { margin: 14px 0 0; max-height: 180px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; }
+.modal .mlist .mli { display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid var(--line); }
+.modal .mlist .mli:last-child { border-bottom: none; }
+.modal .mlist .mli .mn { font-weight: 600; color: var(--ink); }
+.modal .mlist .mli .ms { margin-left: auto; }
+.modal .mfoot { padding: 16px 24px; background: #f8fafd; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--line); }
+.radioset { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.radioset label { display: flex; align-items: center; gap: 11px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; font-size: 14px; }
+.radioset label.on { border-color: var(--blue); background: #f3f7ff; }
+.radioset .rd { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #c6cedd; flex: 0 0 18px; }
+.radioset label.on .rd { border-color: var(--blue); background: radial-gradient(circle at center, var(--blue) 0 5px, #fff 6px); }
+
+/* ---------------- Toast ---------------- */
+.toastwrap { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 1100; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.toast { background: #1c2540; color: #fff; padding: 13px 20px; border-radius: 13px; font-size: 14px; font-weight: 500; box-shadow: 0 12px 30px rgba(20,28,46,.4); display: flex; align-items: center; gap: 10px; animation: toastin .26s cubic-bezier(.2,.8,.3,1); max-width: min(640px, calc(100vw - 48px)); }
+.toast svg { width: 18px; height: 18px; color: #4ade80; flex: 0 0 18px; }
+.toast.err svg { color: #f87171; }
+@keyframes toastin { from { transform: translateY(16px); opacity: 0; } }
+
+/* ---------------- 登入 ---------------- */
+.login-overlay { position: fixed; inset: 0; background: var(--bg, #f4f6fa); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+.login-card { background: #fff; border: 1px solid #e9edf4; border-radius: 18px; padding: 30px 32px; width: 380px; max-width: calc(100vw - 48px); box-shadow: 0 24px 60px rgba(20,28,46,.12); font-family: "Noto Sans TC", -apple-system, sans-serif; }
+.login-card .lbrand { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.login-card .logo { width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(140deg,#4f8bff,#2f6bf0); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 21px; box-shadow: 0 4px 12px rgba(47,107,240,.35); }
+.login-card .lt1 { font-size: 17px; font-weight: 700; color: #20283a; }
+.login-card .lt2 { font-size: 12px; color: #79839a; }
+.login-card .field { margin-bottom: 12px; }
+.login-card .field label { display: block; font-size: 12.5px; color: #79839a; margin-bottom: 5px; font-weight: 500; }
+.login-card input[type=text], .login-card input[type=password] { width: 100%; height: 42px; border: 1px solid #e9edf4; border-radius: 11px; padding: 0 13px; font-size: 14px; font-family: inherit; color: #20283a; background: #f5f7fb; outline: none; }
+.login-card input:focus { border-color: #2f6bf0; background: #fff; }
+.login-card .remember { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #4b5566; margin: 4px 0 10px; cursor: pointer; }
+.login-card .lmsg { color: #d6453d; font-size: 13px; min-height: 18px; margin-bottom: 8px; }
+.login-card .btn-primary { width: 100%; justify-content: center; }
+.login-card .lver { text-align: center; color: #aab2c4; font-size: 11.5px; margin-top: 14px; }
+</style>
+</head>
+<body>
+
+<!-- 登入 -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <div class="lbrand">
+      <div class="logo">A</div>
+      <div><div class="lt1">StudioA 門市預約管理</div><div class="lt2">門市預約後台登入</div></div>
+    </div>
+    <div class="field"><label>帳號</label><input type="text" id="login-user" placeholder="帳號（email）" autocomplete="username"></div>
+    <div class="field"><label>密碼</label><input type="password" id="login-pwd" placeholder="密碼" autocomplete="current-password"></div>
+    <label class="remember"><input type="checkbox" id="login-remember"> 記住帳號（存在此瀏覽器）</label>
+    <div class="lmsg" id="login-msg"></div>
+    <button class="btn-primary" id="login-btn">登入</button>
+    <div class="lver" id="login-ver">版本 —</div>
+  </div>
+</div>
+
+<div class="proto" id="app" style="visibility:hidden">
+  <!-- 側邊欄 -->
+  <div class="sidebar">
+    <div class="brand">
+      <div class="logo">A</div>
+      <div><div class="bt">StudioA</div><div class="bs">門市預約管理</div></div>
+    </div>
+    <div class="nav-section">主功能</div>
+    <button class="navitem active" data-view="overview"><span class="nico" data-ico="grid"></span><span>預約總覽</span></button>
+    <button class="navitem" data-view="interval"><span class="nico" data-ico="cal"></span><span>區間查詢</span></button>
+    <button class="navitem" data-view="status"><span class="nico" data-ico="list"></span><span>狀態管理</span><span class="count" id="nav-count" hidden>0</span></button>
+    <button class="navitem" data-view="fill"><span class="nico" data-ico="box"></span><span>門市遞補</span></button>
+    <button class="navitem" data-view="history"><span class="nico" data-ico="history"></span><span>變更紀錄</span></button>
+    <div class="sidefoot">
+      <div class="av" id="u-avatar">店</div>
+      <div><div class="nm" id="u-shop"></div><div class="rl" id="u-name"></div></div>
+      <button class="relogin" id="relogin">重新登入</button>
+    </div>
+  </div>
+
+  <!-- 主區 -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="ptitle" id="ptitle">預約總覽</div>
+        <div class="psub" id="psub"></div>
+      </div>
+      <div class="right">
+        <span class="topctl" id="top-overview">
+          <label class="pill"><span data-ico="cal"></span><input type="date" id="ov-start"></label>
+          <span class="tilde">~</span>
+          <label class="pill"><span data-ico="cal"></span><input type="date" id="ov-end"></label>
+          <button class="btn-primary" id="ov-query"><span data-ico="search"></span>查詢</button>
+        </span>
+        <button class="iconbtn" id="top-refresh" title="重新整理"><span data-ico="refresh"></span></button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ① 預約總覽 -->
+      <div class="view active" id="view-overview">
+        <div class="cards" id="ov-cards"></div>
+        <div class="tables">
+          <div class="panel">
+            <div class="phead"><span>型號統計</span>
+              <span class="scope-seg" data-scopeseg>
+                <button data-scope="reserved" class="on">僅已預約</button>
+                <button data-scope="unpicked">未取貨</button>
+                <button data-scope="all">全部</button>
+              </span>
+            </div>
+            <div class="pbody" id="ov-models"><div class="pempty">按右上「查詢」載入資料</div></div>
+          </div>
+          <div class="panel">
+            <div class="phead"><span>會員等級統計</span>
+              <span class="scope-seg" data-scopeseg>
+                <button data-scope="reserved" class="on">僅已預約</button>
+                <button data-scope="unpicked">未取貨</button>
+                <button data-scope="all">全部</button>
+              </span>
+            </div>
+            <div class="pbody" id="ov-members"><div class="pempty">按右上「查詢」載入資料</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ② 區間查詢 -->
+      <div class="view" id="view-interval">
+        <div class="quickrow">
+          <button class="qbtn" data-days="0">今天</button>
+          <button class="qbtn on" data-days="6">最近7天</button>
+          <button class="qbtn" data-days="13">最近14天</button>
+          <button class="qbtn" data-days="29">最近30天</button>
+          <button class="qbtn" data-days="-1">本月</button>
+          <span style="flex:1"></span>
+          <label class="pill"><span data-ico="cal"></span><input type="date" id="rg-start"></label>
+          <span class="tilde">~</span>
+          <label class="pill"><span data-ico="cal"></span><input type="date" id="rg-end"></label>
+          <button class="btn-primary" id="rg-query"><span data-ico="search"></span>查詢</button>
+        </div>
+        <div class="bignum">
+          <div><div class="lbl">此區間新增預約</div><div class="v" id="rg-total">—</div></div>
+          <div class="rng" id="rg-range">選擇區間後按「查詢」</div>
+        </div>
+        <div class="intgrid">
+          <div class="panel">
+            <div class="phead"><span>各狀態筆數</span></div>
+            <div class="pbody" id="rg-status"><div class="pempty">尚無資料</div></div>
+          </div>
+          <div class="panel">
+            <div class="phead"><span>每日新增分佈</span><span class="matchcount" id="rg-daycount" style="margin:0">—</span></div>
+            <div class="chart" id="rg-chart"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ③ 狀態管理 -->
+      <div class="view" id="view-status">
+        <div class="filtcard">
+          <div class="searchrow">
+            <div class="search"><span data-ico="search"></span><input id="st-kw" placeholder="輸入預約單號或電話，按 Enter 向後台查單…"></div>
+            <button class="btn-ghost" id="st-search"><span data-ico="list"></span>查單</button>
+            <span class="matchcount" id="st-count">—</span>
+          </div>
+          <div class="dropdowns">
+            <div class="chips" id="st-cats">
+              <button class="chip on" data-cat="全部">全部</button>
+              <button class="chip" data-cat="Mac">Mac</button>
+              <button class="chip" data-cat="iPhone">iPhone</button>
+              <button class="chip" data-cat="iPad">iPad</button>
+              <button class="chip" data-cat="AirPods">AirPods</button>
+              <button class="chip" data-cat="其他">其他</button>
+            </div>
+            <select class="selout" id="st-activity"><option value="">全部活動</option></select>
+            <select class="selout" id="st-batch"><option value="">全部梯次</option></select>
+            <select class="selout" id="st-level"><option value="">全部等級</option></select>
+          </div>
+          <div class="dropdowns">
+            <span class="flabel">狀態（可複選）：</span>
+            <div class="chips" id="st-statuschecks"></div>
+            <button class="btn-primary" id="st-query"><span data-ico="search"></span>查詢</button>
+          </div>
+        </div>
+
+        <div class="tablewrap">
+          <div class="tablescroll">
+            <table>
+              <thead>
+                <tr>
+                  <th class="cb"><span class="chk" id="st-headchk"></span></th>
+                  <th>預約單號</th><th>狀態</th><th>姓名</th><th>電話</th><th>取貨期限</th><th>型號</th><th>梯次</th><th>會員等級</th><th>會員代碼</th><th>預約時間</th><th>門市</th>
+                </tr>
+              </thead>
+              <tbody id="st-tbody">
+                <tr class="emptyrow"><td colspan="12">先用上方「查單」或勾選狀態按「查詢」載入預約單</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="actionbar">
+          <span class="lbl">已選 <b id="st-selcount">0</b> 筆</span>
+          <span class="sep"></span>
+          <div class="sel-status">
+            <span class="lbl">變更為</span>
+            <select class="selout" id="st-newstatus"></select>
+          </div>
+          <button class="btn-primary" id="st-apply" disabled><span data-ico="check"></span>送出變更</button>
+          <span class="spacer"></span>
+          <button class="btn-ghost" id="st-print" disabled><span data-ico="print"></span>列印取貨標籤</button>
+        </div>
+      </div>
+
+      <!-- ④ 門市遞補 -->
+      <div class="view" id="view-fill">
+        <div class="quickrow">
+          <label class="pill"><span data-ico="cal"></span><input type="date" id="fl-start"></label>
+          <span class="tilde">~</span>
+          <label class="pill"><span data-ico="cal"></span><input type="date" id="fl-end"></label>
+          <button class="btn-primary" id="fl-search"><span data-ico="search"></span>搜索</button>
+          <span style="flex:1"></span>
+          <span class="matchcount" id="fl-count">—</span>
+        </div>
+        <div class="panel">
+          <div class="phead"><span>可遞補產品</span></div>
+          <div class="pbody" id="fl-products"><div class="pempty">按「搜索」載入可遞補產品與候補名單</div></div>
+        </div>
+        <div class="tablewrap">
+          <div class="tablescroll" style="max-height:40vh">
+            <table>
+              <thead>
+                <tr>
+                  <th class="cb"><span class="chk" id="fl-headchk"></span></th>
+                  <th>門市</th><th>狀態</th><th>會員等級</th><th>會員代碼</th><th>姓名</th><th>電話</th><th>預約產品</th><th>預約時間</th><th>預約單號</th>
+                </tr>
+              </thead>
+              <tbody id="fl-tbody">
+                <tr class="emptyrow"><td colspan="10">候補名單</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="actionbar">
+          <span class="lbl">已選 <b id="fl-selcount">0</b> 筆</span>
+          <span class="spacer"></span>
+          <button class="btn-primary" id="fl-fill" disabled><span data-ico="check"></span>遞補選取</button>
+        </div>
+      </div>
+
+      <!-- ⑤ 變更紀錄 -->
+      <div class="view" id="view-history">
+        <div class="histnote">
+          此頁用「快照比對」偵測狀態變更：每次載入資料時，發現某筆狀態和上次不同就記一筆（含後台那邊直接改的，例如放棄／取消）。
+          「偵測時間」是本程式發現的時間（非實際變更時間）；後台未提供「誰改的」，故不顯示操作者。
+        </div>
+        <div class="quickrow">
+          <button class="btn-ghost" id="cl-refresh"><span data-ico="refresh"></span>重新整理</button>
+          <select class="selout" id="cl-filter"><option value="">篩新狀態：全部</option></select>
+          <span style="flex:1"></span>
+          <span class="matchcount" id="cl-count">—</span>
+        </div>
+        <div class="timeline" id="cl-timeline"><div class="tl-empty">尚無紀錄</div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- 確認變更狀態 modal -->
+<div class="overlay" id="confirm-overlay" hidden>
+  <div class="modal">
+    <div class="mhead"><div class="mtitle" id="cf-title">確認變更狀態</div></div>
+    <div class="mbody">
+      <span id="cf-text"></span>
+      <div class="mlist" id="cf-list"></div>
+      <div class="hint"><span data-ico="bell"></span><span id="cf-hint">送出後將<b>實際更新後台資料</b>，此操作會記錄在變更紀錄中。</span></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn-ghost" id="cf-cancel">取消</button>
+      <button class="btn-primary" id="cf-ok"><span data-ico="check"></span>確認送出</button>
+    </div>
+  </div>
+</div>
+
+<!-- 列印標籤 modal -->
+<div class="overlay" id="print-overlay" hidden>
+  <div class="modal">
+    <div class="mhead"><div class="mtitle">列印取貨標籤</div></div>
+    <div class="mbody">
+      將為選取的 <b id="pr-count">0</b> 筆預約輸出標籤 PDF，請選擇版型：
+      <div class="radioset" id="pr-radios">
+        <label class="on" data-layout="mac"><span class="rd"></span><span><b>Mac 版型</b><br><span style="color:var(--muted);font-size:12.5px">每頁 30 張小方貼 — 適用 MacBook / iPad / 大型包裝</span></span></label>
+        <label data-layout="iphone"><span class="rd"></span><span><b>iPhone 版型</b><br><span style="color:var(--muted);font-size:12.5px">每頁 48 張長條貼 — 適用手機 / 配件小包裝</span></span></label>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn-ghost" id="pr-cancel">取消</button>
+      <button class="btn-primary" id="pr-ok"><span data-ico="print"></span>產生並開啟</button>
+    </div>
+  </div>
+</div>
+
+<div class="toastwrap" id="toastwrap"></div>
+
+<script>
+"use strict";
+// ===================== 共用 ===================== //
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => [...document.querySelectorAll(sel)];
+
+const ICONS = {
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4" stroke-linecap="round"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2" stroke-linecap="round"/></svg>',
+  box: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" stroke-linejoin="round"/><path d="m3 8 9 5 9-5M12 13v8" stroke-linejoin="round"/></svg>',
+  truck: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7z" stroke-linejoin="round"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  bag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 8h12l-1 12H7L6 8Z" stroke-linejoin="round"/><path d="M9 8a3 3 0 0 1 6 0" stroke-linecap="round"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M6 6l12 12M18 6 6 18" stroke-linecap="round"/></svg>',
+  pct: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 5 5 19" stroke-linecap="round"/><circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>',
+  grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" stroke-linecap="round"/></svg>',
+  history: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 4v4h4" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8v4l3 2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  print: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v7H8z" stroke-linejoin="round"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-2 9-2 9h16s-2-2-2-9" stroke-linejoin="round"/><path d="M10.5 21a2 2 0 0 0 3 0" stroke-linecap="round"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14m0 0-6-6m6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+// 套用 data-ico 圖示
+$$("[data-ico]").forEach((el) => { el.innerHTML = ICONS[el.dataset.ico] || ""; el.style.display = "inline-flex"; });
+
+const STATUS_NAMES = {3:"已預約",4:"已配貨",5:"已到貨",6:"保留",7:"已取貨",8:"放棄",21:"已取消"};
+const CHANGE_STATUS_OPTIONS = [3,4,5,6,7,8,21];
+const SHOP_CHANGEABLE = [5,6,7];
+const UNPICKED = new Set([3,4,5,6]);
+const STATUS_CLASS = {
+  "已到貨":"s-arrival","保留":"s-hold","已配貨":"s-alloc","已預約":"s-reserved",
+  "已取貨":"s-pick","放棄":"s-abandon","取消":"s-cancel","已取消":"s-cancel",
+};
+function badge(name) { return `<span class="badge ${STATUS_CLASS[name] || "s-reserved"}">${esc(name || "—")}</span>`; }
+function esc(s) { const d = document.createElement("span"); d.textContent = s ?? ""; return d.innerHTML; }
+function fmtDate(d) { return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+function addDays(n) { const d = new Date(); d.setDate(d.getDate()+n); return d; }
+function fmtNum(v) { return (typeof v === "number") ? v.toLocaleString() : (v ?? "—"); }
+
+// Toast（成功＝深色綠勾、錯誤＝紅叉）
+function toast(msg, isErr) {
+  const el = document.createElement("div");
+  el.className = "toast" + (isErr ? " err" : "");
+  el.innerHTML = (isErr ? ICONS.x : ICONS.check) + `<span>${esc(msg)}</span>`;
+  $("#toastwrap").appendChild(el);
+  setTimeout(() => el.remove(), isErr ? 5200 : 2600);
+}
+
+async function apiFetch(url, opts) {
+  let resp;
+  try { resp = await fetch(url, opts); }
+  catch (e) { throw new Error("連線本機伺服器失敗，請確認 web_app.py 仍在執行。"); }
+  const ct = resp.headers.get("Content-Type") || "";
+  if (ct.includes("application/pdf")) return resp.blob();
+  const body = await resp.json();
+  if (!resp.ok) {
+    if (resp.status === 401) showLogin(body.error || "請重新登入。");
+    throw new Error(body.error || ("HTTP " + resp.status));
+  }
+  return body;
+}
+const apiGet = (url) => apiFetch(url);
+const apiPost = (url, data) => apiFetch(url, {
+  method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)
+});
+
+function busy(btn, on, textOn) {
+  if (on) {
+    btn.dataset.prevHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = textOn;
+  } else {
+    btn.disabled = false;
+    if (btn.dataset.prevHtml) btn.innerHTML = btn.dataset.prevHtml;
+  }
+}
+
+// 排行清單（名次 + 長條 + 數量）
+function renderRank(container, counter) {
+  const rows = Object.entries(counter).sort((a, b) => b[1] - a[1]);
+  if (!rows.length) { container.innerHTML = `<div class="pempty">此範圍沒有資料</div>`; return; }
+  const maxc = rows[0][1] || 1;
+  container.innerHTML = rows.map(([name, cnt], i) => `
+    <div class="zrow">
+      <span class="rank">${i + 1}</span>
+      <span class="rname" title="${esc(name || "（無）")}">${esc(name || "（無）")}</span>
+      <span class="bar"><i style="width:${Math.round(cnt / maxc * 100)}%"></i></span>
+      <span class="rcount">${cnt}</span>
+    </div>`).join("");
+}
+
+// ===================== 確認 modal（共用） ===================== //
+let confirmAction = null;
+function showConfirm({ title, text, items, hint, okLabel, onOk }) {
+  $("#cf-title").textContent = title;
+  $("#cf-text").innerHTML = text;
+  $("#cf-list").innerHTML = (items || []).map((it) => `
+    <div class="mli">
+      <span class="mn">${esc(it.name || "?")}</span>
+      <span style="color:var(--muted)">${esc(it.sno || "")}</span>
+      <span class="ms">${badge(it.status)}</span>
+    </div>`).join("");
+  $("#cf-list").style.display = items && items.length ? "" : "none";
+  $("#cf-hint").innerHTML = hint;
+  $("#cf-ok").innerHTML = ICONS.check + (okLabel || "確認送出");
+  confirmAction = onOk;
+  $("#confirm-overlay").hidden = false;
+}
+$("#cf-cancel").addEventListener("click", () => { $("#confirm-overlay").hidden = true; });
+$("#confirm-overlay").addEventListener("click", (e) => { if (e.target === e.currentTarget) $("#confirm-overlay").hidden = true; });
+$("#cf-ok").addEventListener("click", () => {
+  $("#confirm-overlay").hidden = true;
+  if (confirmAction) confirmAction();
+});
+
+// ===================== 登入 ===================== //
+function showLogin(msg) {
+  $("#login-msg").textContent = msg || "";
+  $("#login-overlay").style.display = "flex";
+  $("#login-pwd").value = "";
+  ($("#login-user").value ? $("#login-pwd") : $("#login-user")).focus();
+}
+
+async function doLogin() {
+  const user = $("#login-user").value.trim();
+  const pwd = $("#login-pwd").value;
+  const btn = $("#login-btn");
+  $("#login-msg").textContent = "";
+  busy(btn, true, "登入中…");
+  try {
+    const info = await apiPost("/api/login", {username: user, password: pwd});
+    localStorage.setItem("studioa_username", $("#login-remember").checked ? user : "");
+    $("#login-overlay").style.display = "none";
+    $("#app").style.visibility = "visible";
+    $("#u-shop").textContent = info.shopName || "";
+    $("#u-name").textContent = info.userName || "";
+    $("#u-avatar").textContent = (info.shopName || "店").slice(0, 1);
+    document.title = `StudioA 門市預約管理 — ${info.shopName || ""}`;
+    loadActivities();
+    ovQuery();   // 登入後自動載入總覽
+  } catch (e) {
+    $("#login-msg").textContent = e.message;
+  } finally {
+    busy(btn, false);
+  }
+}
+$("#login-btn").addEventListener("click", doLogin);
+$("#login-pwd").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+$("#login-user").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#login-pwd").focus(); });
+$("#relogin").addEventListener("click", () => showLogin());
+
+// ===================== 導覽 / 頂欄 ===================== //
+const TAB_META = {
+  overview: { title: "預約總覽", sub: () => ovSub },
+  interval: { title: "區間查詢", sub: () => "依日期區間檢視新增預約與每日分佈" },
+  status:   { title: "狀態管理", sub: () => `共 ${stAllItems.length} 筆 · 已選 ${stSel.size} 筆` },
+  fill:     { title: "門市遞補", sub: () => flSub },
+  history:  { title: "變更紀錄", sub: () => "自開始使用後累積偵測到的狀態變更" },
+};
+let curTab = "overview";
+let ovSub = "選擇日期區間後按「查詢」";
+let flSub = "查詢可遞補產品數量與候補名單";
+
+function refreshTopbar() {
+  const meta = TAB_META[curTab];
+  $("#ptitle").textContent = meta.title;
+  $("#psub").textContent = meta.sub();
+  $("#top-overview").style.display = curTab === "overview" ? "inline-flex" : "none";
+  $("#top-overview").style.gap = "10px";
+  $("#top-overview").style.alignItems = "center";
+}
+
+$$(".navitem[data-view]").forEach((el) => {
+  el.addEventListener("click", () => {
+    $$(".navitem").forEach((x) => x.classList.remove("active"));
+    el.classList.add("active");
+    $$(".view").forEach((v) => v.classList.remove("active"));
+    $("#view-" + el.dataset.view).classList.add("active");
+    curTab = el.dataset.view;
+    refreshTopbar();
+    if (curTab === "history") clReload();
+  });
+});
+
+$("#top-refresh").addEventListener("click", () => {
+  if (curTab === "overview") ovQuery();
+  else if (curTab === "interval") rgQuery();
+  else if (curTab === "status") { if ($("#st-kw").value.trim()) stSearch(); else stQueryByStatus(); }
+  else if (curTab === "fill") flSearch();
+  else if (curTab === "history") clReload();
+});
+
+// ===================== ① 預約總覽 ===================== //
+const OV_CARDS = [
+  { key: "reservationCount", label: "目前剩餘已預約", hl: true, ico: "box" },
+  { key: "totalCount",       label: "總數量",   ico: "grid",  tone: "i-violet" },
+  { key: "allocationCount",  label: "已配貨",   ico: "truck", tone: "i-blue" },
+  { key: "arrivalCount",     label: "已到貨",   ico: "check", tone: "i-green" },
+  { key: "reserveCount",     label: "保留",     ico: "clock", tone: "i-amber" },
+  { key: "pickCount",        label: "已取貨",   ico: "bag",   tone: "i-teal" },
+  { key: "abandonCount",     label: "放棄",     ico: "x",     tone: "i-rose" },
+  { key: "cancelCount",      label: "取消",     ico: "x",     tone: "i-rose" },
+  { key: "pickupRate",       label: "取貨率",   ico: "pct",   tone: "i-teal" },
+];
+let ovItems = [];
+let ovScope = "reserved";
+$("#ov-start").value = fmtDate(addDays(-180));
+$("#ov-end").value = fmtDate(addDays(180));
+
+function renderCards(stats) {
+  $("#ov-cards").innerHTML = OV_CARDS.map((c) => `
+    <div class="card${c.hl ? " hl" : ""}">
+      <div class="ico${c.hl ? "" : " " + c.tone}">${ICONS[c.ico]}</div>
+      <div><div class="clabel">${c.label}</div><div class="cval">${fmtNum(stats ? stats[c.key] : null)}</div></div>
+    </div>`).join("");
+  const n = stats ? stats.reservationCount : null;
+  $("#nav-count").hidden = n == null;
+  if (n != null) $("#nav-count").textContent = fmtNum(n);
+}
+renderCards(null);
+
+async function ovQuery() {
+  const btn = $("#ov-query");
+  busy(btn, true, "讀取中…");
+  try {
+    const data = await apiGet(`/api/reservations?start=${$("#ov-start").value}&end=${$("#ov-end").value}`);
+    ovItems = data.items;
+    renderCards(data.stats);
+    ovRecompute();
+    ovSub = `${$("#ov-start").value} ～ ${$("#ov-end").value} · ${$("#u-shop").textContent}`;
+    refreshTopbar();
+  } catch (e) { toast(e.message, true); }
+  finally { busy(btn, false); }
+}
+function ovRecompute() {
+  let items = ovItems;
+  if (ovScope === "reserved") items = ovItems.filter((it) => it.status === 3);
+  else if (ovScope === "unpicked") items = ovItems.filter((it) => UNPICKED.has(it.status));
+  const cnt = (key) => {
+    const c = {};
+    items.forEach((it) => { const k = it[key] || ""; c[k] = (c[k] || 0) + 1; });
+    return c;
+  };
+  renderRank($("#ov-models"), cnt("productName"));
+  renderRank($("#ov-members"), cnt("userClassName"));
+}
+$("#ov-query").addEventListener("click", ovQuery);
+// 兩個面板共用統計範圍（與原型一致）
+$$("[data-scopeseg]").forEach((seg) => {
+  seg.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-scope]");
+    if (!b) return;
+    ovScope = b.dataset.scope;
+    $$("[data-scopeseg] button").forEach((x) => x.classList.toggle("on", x.dataset.scope === ovScope));
+    ovRecompute();
+  });
+});
+
+// ===================== ② 區間查詢 ===================== //
+$("#rg-start").value = fmtDate(addDays(-6));
+$("#rg-end").value = fmtDate(new Date());
+
+$$("#view-interval .qbtn").forEach((b) => {
+  b.addEventListener("click", () => {
+    $$("#view-interval .qbtn").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on");
+    const days = parseInt(b.dataset.days, 10);
+    const today = new Date();
+    $("#rg-start").value = days === -1
+      ? fmtDate(new Date(today.getFullYear(), today.getMonth(), 1))
+      : fmtDate(addDays(-days));
+    $("#rg-end").value = fmtDate(today);
+    rgQuery();
+  });
+});
+["#rg-start", "#rg-end"].forEach((s) => $(s).addEventListener("change", () => {
+  $$("#view-interval .qbtn").forEach((x) => x.classList.remove("on"));
+}));
+
+async function rgQuery() {
+  const btn = $("#rg-query");
+  busy(btn, true, "查詢中…");
+  try {
+    const data = await apiGet(`/api/reservations?start=${$("#rg-start").value}&end=${$("#rg-end").value}`);
+    const total = data.stats.totalCount ?? data.items.length;
+    $("#rg-total").textContent = fmtNum(total);
+    $("#rg-range").textContent = `${$("#rg-start").value} ～ ${$("#rg-end").value}`;
+    // 各狀態筆數
+    const sc = {};
+    data.items.forEach((it) => { const k = it.statusName || ""; sc[k] = (sc[k] || 0) + 1; });
+    const srows = Object.entries(sc).sort((a, b) => b[1] - a[1]);
+    const smax = srows.length ? srows[0][1] : 1;
+    $("#rg-status").innerHTML = srows.length ? srows.map(([name, n]) => `
+      <div class="statline">${badge(name)}<span style="flex:1"></span>
+        <span class="bar"><i style="width:${Math.round(n / smax * 100)}%"></i></span>
+        <span class="vv">${n}</span></div>`).join("")
+      : `<div class="pempty">此區間沒有資料</div>`;
+    // 每日新增長條圖
+    const dc = {};
+    data.items.forEach((it) => {
+      const v = (it.reservationTimeValue || "").trim().replace(/\//g, "-");
+      if (v.length >= 10) { const d = v.slice(0, 10); dc[d] = (dc[d] || 0) + 1; }
+    });
+    const drows = Object.entries(dc).sort();
+    const dmax = Math.max(1, ...drows.map(([, n]) => n));
+    $("#rg-chart").innerHTML = drows.length ? drows.map(([d, n]) => `
+      <div class="colwrap">
+        <div class="col" style="height:${Math.max(3, Math.round(n / dmax * 100))}%"><span class="cv">${n}</span></div>
+        <span class="dl">${esc(d.slice(5).replace("-", "/"))}</span>
+      </div>`).join("")
+      : `<div class="pempty" style="width:100%">此區間沒有資料</div>`;
+    $("#rg-daycount").textContent = `${drows.length} 天`;
+  } catch (e) { toast(e.message, true); }
+  finally { busy(btn, false); }
+}
+$("#rg-query").addEventListener("click", rgQuery);
+
+// ===================== ③ 狀態管理 ===================== //
+const ST_COLUMNS = ["orderSNo", "statusName", "subscriberName", "subscriberContactNumber",
+                    "_pickupDeadline", "productName", "batchNo", "userClassName",
+                    "vipId", "reservationTimeValue", "shopName"];
+let stAllItems = [];   // 本次查詢回來的全部
+let stRows = [];       // 套用篩選後顯示中的
+let stSel = new Set(); // 已勾選（key = productOrderProductShelfId 或 orderSNo）
+let stCat = "全部";
+let activityMap = {};  // reservationActivityId -> 名稱
+
+const rowKey = (it) => it.productOrderProductShelfId || it.orderSNo || "";
+function pickupDeadline(it) {
+  const v = it.arrivalEndTime || it.reserveEndTime || it.arrivalEndTimeValue || it.reserveEndTimeValue;
+  return v ? String(v).replace(/\//g, "-").slice(0, 10) : "";
+}
+function productCategory(name) {
+  const s = (name || "").toLowerCase();
+  if (s.includes("airpods")) return "AirPods";
+  if (s.includes("ipad")) return "iPad";
+  if (s.includes("iphone")) return "iPhone";
+  if (s.includes("mac")) return "Mac";
+  return "其他";
+}
+function activityLabel(aid) {
+  if (!aid) return "";
+  return activityMap[aid] || ("活動 " + String(aid).slice(0, 8) + "…");
+}
+async function loadActivities() {
+  try {
+    const lst = await apiGet("/api/activities");
+    activityMap = {};
+    (lst || []).forEach((a) => { if (a.id) activityMap[a.id] = (a.name || "").trim(); });
+    if (stAllItems.length) { stPopulateFilters(stAllItems); stApplyFilters(); }
+  } catch (e) { /* 抓不到活動名稱不影響其他功能 */ }
+}
+
+// 狀態複選（chip 樣式；預設勾「已到貨」「保留」）
+$("#st-statuschecks").innerHTML = CHANGE_STATUS_OPTIONS.map((c) =>
+  `<button class="chip${c === 5 || c === 6 ? " on" : ""}" data-code="${c}">${STATUS_NAMES[c]}</button>`
+).join("");
+$("#st-statuschecks").addEventListener("click", (e) => {
+  const b = e.target.closest(".chip");
+  if (b) b.classList.toggle("on");
+});
+// 變更狀態下拉
+$("#st-newstatus").innerHTML = CHANGE_STATUS_OPTIONS.map((c) =>
+  `<option value="${c}">${STATUS_NAMES[c]}${SHOP_CHANGEABLE.includes(c) ? "（門市標準）" : ""}</option>`
+).join("");
+$("#st-newstatus").value = "5";
+
+$("#st-kw").addEventListener("keydown", (e) => { if (e.key === "Enter") stSearch(); });
+
+async function stSearch() {
+  const kw = $("#st-kw").value.trim();
+  if (!kw) { toast("請先輸入要查詢的預約單號或電話。", true); return; }
+  const btn = $("#st-search");
+  busy(btn, true, "查詢中…");
+  // 09 開頭的 10 碼數字視為電話，其餘當預約單號
+  const isPhone = /^09\d{8}$/.test(kw);
+  const param = isPhone ? `phone=${encodeURIComponent(kw)}` : `orderSno=${encodeURIComponent(kw)}`;
+  try {
+    const data = await apiGet(`/api/reservations?${param}`);
+    stOnRows(data.items);
+  } catch (e) { toast(e.message, true); }
+  finally { busy(btn, false); }
+}
+$("#st-search").addEventListener("click", stSearch);
+
+async function stQueryByStatus() {
+  const codes = $$("#st-statuschecks .chip.on").map((c) => c.dataset.code);
+  const btn = $("#st-query");
+  busy(btn, true, "查詢中…");
+  try {
+    const data = await apiGet(`/api/reservations?statuses=${codes.join(",")}`);
+    stOnRows(data.items);
+  } catch (e) { toast(e.message, true); }
+  finally { busy(btn, false); }
+}
+$("#st-query").addEventListener("click", stQueryByStatus);
+
+function stOnRows(items) {
+  stAllItems = items;
+  stSel = new Set();
+  stPopulateFilters(items);
+  stApplyFilters();
+  if (!items.length) toast("查無資料。", true);
+}
+
+function stPopulateFilters(items) {
+  const fill = (sel, allLabel, values, labelFn) => {
+    const prev = sel.value;
+    sel.innerHTML = `<option value="">${allLabel}</option>` +
+      values.map((v) => `<option value="${esc(String(v))}">${esc(labelFn ? labelFn(v) : String(v))}</option>`).join("");
+    sel.value = [...sel.options].some((o) => o.value === prev) ? prev : "";
+  };
+  const actIds = [...new Set(items.map((it) => it.reservationActivityId).filter(Boolean))]
+    .sort((a, b) => activityLabel(a).localeCompare(activityLabel(b)));
+  fill($("#st-activity"), "全部活動", actIds, activityLabel);
+  fill($("#st-batch"), "全部梯次", [...new Set(items.map((it) => it.batchNo).filter(Boolean))].sort());
+  fill($("#st-level"), "全部等級", [...new Set(items.map((it) => it.userClassName).filter(Boolean))].sort());
+}
+
+function stApplyFilters() {
+  const act = $("#st-activity").value, bat = $("#st-batch").value, lvl = $("#st-level").value;
+  stRows = stAllItems.filter((it) =>
+    (stCat === "全部" || productCategory(it.productName) === stCat) &&
+    (!act || String(it.reservationActivityId) === act) &&
+    (!bat || String(it.batchNo) === bat) &&
+    (!lvl || String(it.userClassName) === lvl)
+  );
+  stRenderRows();
+  $("#st-count").textContent = `符合 ${stRows.length}／共 ${stAllItems.length} 筆`;
+}
+["#st-activity", "#st-batch", "#st-level"].forEach((s) => $(s).addEventListener("change", stApplyFilters));
+$("#st-cats").addEventListener("click", (e) => {
+  const b = e.target.closest(".chip");
+  if (!b) return;
+  $$("#st-cats .chip").forEach((x) => x.classList.remove("on"));
+  b.classList.add("on");
+  stCat = b.dataset.cat;
+  stApplyFilters();
+});
+
+function stRenderRows() {
+  const tbody = $("#st-tbody");
+  if (!stRows.length) {
+    tbody.innerHTML = `<tr class="emptyrow"><td colspan="12">沒有符合條件的預約單</td></tr>`;
+  } else {
+    tbody.innerHTML = stRows.map((it) => {
+      const key = rowKey(it);
+      const on = stSel.has(key);
+      return `<tr data-key="${esc(key)}" class="${on ? "sel" : ""}">
+        <td class="cb"><span class="chk${on ? " on" : ""}"></span></td>` +
+        ST_COLUMNS.map((k) => {
+          if (k === "statusName") return `<td>${badge(it.statusName)}</td>`;
+          if (k === "subscriberName") return `<td style="font-weight:600;color:var(--ink)">${esc(it[k] ?? "")}</td>`;
+          if (k === "orderSNo") return `<td style="font-variant-numeric:tabular-nums">${esc(it[k] ?? "")}</td>`;
+          const v = k === "_pickupDeadline" ? pickupDeadline(it) : it[k];
+          return `<td>${esc(v == null ? "" : String(v))}</td>`;
+        }).join("") + "</tr>";
+    }).join("");
+  }
+  stSyncSelUI();
+}
+
+function stSyncSelUI() {
+  const visKeys = stRows.map(rowKey);
+  const allSel = visKeys.length > 0 && visKeys.every((k) => stSel.has(k));
+  const someSel = visKeys.some((k) => stSel.has(k));
+  $("#st-headchk").className = "chk" + (allSel ? " on" : someSel ? " partial" : "");
+  $("#st-selcount").textContent = stSel.size;
+  $("#st-apply").disabled = stSel.size === 0;
+  $("#st-print").disabled = stSel.size === 0;
+  refreshTopbar();
+}
+
+$("#st-tbody").addEventListener("click", (e) => {
+  const tr = e.target.closest("tr[data-key]");
+  if (!tr) return;
+  const key = tr.dataset.key;
+  if (stSel.has(key)) stSel.delete(key); else stSel.add(key);
+  tr.classList.toggle("sel", stSel.has(key));
+  tr.querySelector(".chk").classList.toggle("on", stSel.has(key));
+  stSyncSelUI();
+});
+$("#st-headchk").addEventListener("click", () => {
+  const visKeys = stRows.map(rowKey);
+  const allSel = visKeys.length > 0 && visKeys.every((k) => stSel.has(k));
+  visKeys.forEach((k) => { if (allSel) stSel.delete(k); else stSel.add(k); });
+  stRenderRows();
+});
+
+const stSelectedItems = () => stAllItems.filter((it) => stSel.has(rowKey(it)));
+
+// ---- 送出變更（確認 modal） ---- //
+$("#st-apply").addEventListener("click", () => {
+  const selected = stSelectedItems();
+  if (!selected.length) return;
+  const code = parseInt($("#st-newstatus").value, 10);
+  const ids = selected.map((it) => it.productOrderProductShelfId).filter(Boolean);
+  if (!ids.length) { toast("選取的資料缺少可變更的 ID。", true); return; }
+  showConfirm({
+    title: "確認變更狀態",
+    text: `即將把以下 <b>${ids.length}</b> 筆預約變更為「<b>${STATUS_NAMES[code]}</b>」：`,
+    items: selected.map((it) => ({ name: it.subscriberName, sno: it.orderSNo, status: it.statusName })),
+    hint: "送出後將<b>實際更新後台資料</b>，此操作會記錄在變更紀錄中。",
+    onOk: async () => {
+      const btn = $("#st-apply");
+      busy(btn, true, "送出中…");
+      try {
+        const r = await apiPost("/api/update-status", {shelfIds: ids, status: code});
+        toast(r.message);
+        if ($("#st-kw").value.trim()) stSearch(); else stQueryByStatus();
+      } catch (e) { toast("變更失敗：" + e.message, true); }
+      finally { busy(btn, false); stSyncSelUI(); }
+    },
+  });
+});
+
+// ---- 列印標籤 modal ---- //
+let prLayout = "mac";
+$("#pr-radios").addEventListener("click", (e) => {
+  const lab = e.target.closest("label[data-layout]");
+  if (!lab) return;
+  prLayout = lab.dataset.layout;
+  $$("#pr-radios label").forEach((x) => x.classList.toggle("on", x === lab));
+});
+$("#pr-cancel").addEventListener("click", () => { $("#print-overlay").hidden = true; });
+$("#print-overlay").addEventListener("click", (e) => { if (e.target === e.currentTarget) $("#print-overlay").hidden = true; });
+
+$("#st-print").addEventListener("click", () => {
+  const selected = stSelectedItems();
+  if (!selected.length) return;
+  const notArrived = selected.filter((it) => it.status !== 5).length;
+  $("#pr-count").textContent = selected.length + (notArrived ? `（其中 ${notArrived} 筆不是「已到貨」）` : "");
+  $("#print-overlay").hidden = false;
+});
+
+$("#pr-ok").addEventListener("click", async () => {
+  $("#print-overlay").hidden = true;
+  const selected = stSelectedItems();
+  const records = selected.map((it) => ({
+    "預約單號": it.orderSNo || "",
+    "會員代碼": it.vipId || "",
+    "姓名": it.subscriberName || "",
+    "手機號碼": it.subscriberContactNumber || "",
+    "梯次": it.batchNo || "",
+    "預約產品": it.productName || "",
+    "預計取機時間": pickupDeadline(it),
+  }));
+  const btn = $("#st-print");
+  busy(btn, true, "產生中…");
+  try {
+    const blob = await apiPost("/api/labels", {records, layout: prLayout});
+    window.open(URL.createObjectURL(blob), "_blank");
+    toast(`已產生 ${records.length} 張標籤 PDF，請在新分頁按 Cmd+P 列印。`);
+  } catch (e) { toast("產生標籤失敗：" + e.message, true); }
+  finally { busy(btn, false); stSyncSelUI(); }
+});
+
+// ===================== ④ 門市遞補 ===================== //
+const FL_COLUMNS = ["shopName", "statusName", "userClassName", "vipId", "subscriberName",
+                    "subscriberContactNumber", "productName", "reservationTimeValue", "orderSNo"];
+let flItems = [];
+let flSel = new Set();
+$("#fl-start").value = fmtDate(addDays(-180));
+$("#fl-end").value = fmtDate(addDays(180));
+
+async function flSearch() {
+  const btn = $("#fl-search");
+  busy(btn, true, "搜索中…");
+  try {
+    const data = await apiGet(`/api/fill-list?start=${$("#fl-start").value}&end=${$("#fl-end").value}`);
+    const prods = (data.fillProductShelfEntitys || []).slice().sort((a, b) => (b.number || 0) - (a.number || 0));
+    const pmax = Math.max(1, ...prods.map((p) => p.number || 0));
+    $("#fl-products").innerHTML = prods.length ? prods.map((p, i) => `
+      <div class="zrow">
+        <span class="rank">${i + 1}</span>
+        <span class="rname" title="${esc(p.productName || "")}">${esc(p.productName || "")}</span>
+        <span class="bar"><i style="width:${Math.round((p.number || 0) / pmax * 100)}%"></i></span>
+        <span class="rcount">${p.number || 0}</span>
+      </div>`).join("")
+      : `<div class="pempty">此區間沒有可遞補產品</div>`;
+    flItems = data.fillListOutDtos || [];
+    flSel = new Set();
+    flRender();
+    $("#fl-count").textContent = `可遞補產品 ${prods.length} 種 ・ 候補名單 ${flItems.length} 筆`;
+    flSub = `可遞補產品 ${prods.length} 種 ・ 候補名單 ${flItems.length} 筆`;
+    refreshTopbar();
+  } catch (e) { toast(e.message, true); }
+  finally { busy(btn, false); }
+}
+$("#fl-search").addEventListener("click", flSearch);
+
+const flKey = (it) => it.productOrderProductShelfId || it.orderSNo || "";
+function flRender() {
+  const tbody = $("#fl-tbody");
+  if (!flItems.length) {
+    tbody.innerHTML = `<tr class="emptyrow"><td colspan="10">沒有候補名單</td></tr>`;
+  } else {
+    tbody.innerHTML = flItems.map((it) => {
+      const key = flKey(it);
+      const on = flSel.has(key);
+      return `<tr data-key="${esc(key)}" class="${on ? "sel" : ""}">
+        <td class="cb"><span class="chk${on ? " on" : ""}"></span></td>` +
+        FL_COLUMNS.map((k) => {
+          if (k === "statusName") return `<td>${badge(it.statusName)}</td>`;
+          if (k === "subscriberName") return `<td style="font-weight:600;color:var(--ink)">${esc(it[k] ?? "")}</td>`;
+          return `<td>${esc(it[k] == null ? "" : String(it[k]))}</td>`;
+        }).join("") + "</tr>";
+    }).join("");
+  }
+  flSyncSelUI();
+}
+function flSyncSelUI() {
+  const keys = flItems.map(flKey);
+  const allSel = keys.length > 0 && keys.every((k) => flSel.has(k));
+  const someSel = keys.some((k) => flSel.has(k));
+  $("#fl-headchk").className = "chk" + (allSel ? " on" : someSel ? " partial" : "");
+  $("#fl-selcount").textContent = flSel.size;
+  $("#fl-fill").disabled = flSel.size === 0;
+}
+$("#fl-tbody").addEventListener("click", (e) => {
+  const tr = e.target.closest("tr[data-key]");
+  if (!tr) return;
+  const key = tr.dataset.key;
+  if (flSel.has(key)) flSel.delete(key); else flSel.add(key);
+  tr.classList.toggle("sel", flSel.has(key));
+  tr.querySelector(".chk").classList.toggle("on", flSel.has(key));
+  flSyncSelUI();
+});
+$("#fl-headchk").addEventListener("click", () => {
+  const keys = flItems.map(flKey);
+  const allSel = keys.length > 0 && keys.every((k) => flSel.has(k));
+  keys.forEach((k) => { if (allSel) flSel.delete(k); else flSel.add(k); });
+  flRender();
+});
+
+$("#fl-fill").addEventListener("click", () => {
+  const selected = flItems.filter((it) => flSel.has(flKey(it)));
+  if (!selected.length) return;
+  const ids = selected.map((it) => it.productOrderProductShelfId).filter(Boolean);
+  showConfirm({
+    title: "確認遞補",
+    text: `即將把以下 <b>${ids.length}</b> 筆候補遞補進去：`,
+    items: selected.map((it) => ({ name: it.subscriberName, sno: it.orderSNo, status: it.statusName })),
+    hint: "此動作會<b>實際更新後台資料</b>，無法在此復原。",
+    okLabel: "確認遞補",
+    onOk: async () => {
+      const btn = $("#fl-fill");
+      busy(btn, true, "遞補中…");
+      try {
+        const r = await apiPost("/api/fill", {shelfIds: ids});
+        toast(r.message);
+        flSearch();
+      } catch (e) { toast(e.message, true); }
+      finally { busy(btn, false); flSyncSelUI(); }
+    },
+  });
+});
+
+// ===================== ⑤ 變更紀錄 ===================== //
+$("#cl-filter").innerHTML = `<option value="">篩新狀態：全部</option>` +
+  CHANGE_STATUS_OPTIONS.map((c) => `<option value="${STATUS_NAMES[c]}">${STATUS_NAMES[c]}</option>`).join("");
+
+async function clReload() {
+  try {
+    let rows = await apiGet("/api/changelog");
+    rows = rows.slice().reverse();  // 最新在上
+    const flt = $("#cl-filter").value;
+    if (flt) rows = rows.filter((r) => (r.newStatusName || "").includes(flt));
+    $("#cl-timeline").innerHTML = rows.length ? rows.map((r) => {
+      const toBad = ["取消", "已取消", "放棄"].includes(r.newStatusName || "");
+      return `<div class="tl-item">
+        <div class="tl-dot ${STATUS_CLASS[r.newStatusName] || "s-reserved"}">${toBad ? ICONS.x : ICONS.check}</div>
+        <div class="tl-main">
+          <div class="tl-row1">
+            <span class="tl-name">${esc(r.subscriberName || "—")}</span>
+            <span class="tl-sno">${esc(r.orderSNo || "")}</span>
+          </div>
+          <div class="tl-change">${badge(r.oldStatusName)}${ICONS.arrow}${badge(r.newStatusName)}</div>
+        </div>
+        <div class="tl-meta">${esc(r.detectedAt || "")}<span class="prod">${esc(r.productName || "")}</span></div>
+      </div>`;
+    }).join("") : `<div class="tl-empty">尚無紀錄</div>`;
+    $("#cl-count").textContent = `共 ${rows.length} 筆變更`;
+  } catch (e) { toast(e.message, true); }
+}
+$("#cl-refresh").addEventListener("click", clReload);
+$("#cl-filter").addEventListener("change", clReload);
+
+// ===================== 啟動 ===================== //
+(async function init() {
+  refreshTopbar();
+  try {
+    const s = await apiGet("/api/session");
+    $("#login-ver").textContent = `版本 v${s.version}`;
+  } catch (e) { /* 伺服器沒回也照常顯示登入 */ }
+  const saved = localStorage.getItem("studioa_username") || "";
+  $("#login-user").value = saved;
+  $("#login-remember").checked = !!saved;
+  showLogin();
+})();
+</script>
+</body>
+</html>
