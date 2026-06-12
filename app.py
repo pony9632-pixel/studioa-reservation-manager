@@ -681,15 +681,15 @@ class StatusTab(QWidget):
         fv.addLayout(rowB)
 
         # ③ 狀態（可複選）＋ 查詢（這排會去後台載入；上面條件查詢後仍保留並套用）
+        # 與「大分類」相同的按鈕式選取（可多選）；預設不選，由使用者自行挑選
         rowC = QHBoxLayout()
         rowC.addWidget(QLabel("狀態（可複選）："))
-        self._status_checks: dict[int, QCheckBox] = {}
+        self._status_checks: dict[int, QPushButton] = {}
         for code in CHANGE_STATUS_OPTIONS:
-            cb = QCheckBox(STATUS_CODE_TO_NAME[code])
-            if code in (5, 6):  # 預設勾「已到貨」「保留」（最常用）
-                cb.setChecked(True)
-            self._status_checks[code] = cb
-            rowC.addWidget(cb)
+            b = QPushButton(STATUS_CODE_TO_NAME[code])
+            b.setCheckable(True)
+            self._status_checks[code] = b
+            rowC.addWidget(b)
         self.query_btn = QPushButton("查詢")
         self.query_btn.setStyleSheet("font-weight:bold;")
         self.query_btn.clicked.connect(self.query_by_status)
