@@ -249,6 +249,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def _pick_port() -> int:
+    env_port = os.environ.get("PORT")
+    if env_port:
+        return int(env_port)
     for port in [PORT_PREFERRED] + list(range(PORT_PREFERRED + 1, PORT_PREFERRED + 20)):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             if s.connect_ex((HOST, port)) != 0:
