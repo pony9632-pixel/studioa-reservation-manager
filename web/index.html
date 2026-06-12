@@ -325,6 +325,8 @@ th.cb, td.cb { width: 46px; text-align: center; padding-left: 16px; }
   .panel .phead { padding: 12px 14px; font-size: 14px; flex-wrap: wrap; }
   .panel .pbody { max-height: 46vh; }
   .zrow { padding: 8px 10px; font-size: 12.5px; }
+  /* 手機：名稱換行完整顯示，不截斷 */
+  .zrow .rname { white-space: normal; word-break: break-word; line-height: 1.4; }
   .zrow .bar { width: 56px; flex: 0 0 56px; margin: 0 8px; }
   .zrow .rcount { width: 34px; flex: 0 0 34px; font-size: 13px; }
 
@@ -693,6 +695,9 @@ function busy(btn, on, textOn) {
   }
 }
 
+// 產品名開頭的「預約｜」每筆都一樣，顯示時拿掉以節省空間
+function stripPrefix(name) { return (name || "").replace(/^預約｜/, ""); }
+
 // 排行清單（名次 + 長條 + 數量）
 function renderRank(container, counter) {
   const rows = Object.entries(counter).sort((a, b) => b[1] - a[1]);
@@ -701,7 +706,7 @@ function renderRank(container, counter) {
   container.innerHTML = rows.map(([name, cnt], i) => `
     <div class="zrow">
       <span class="rank">${i + 1}</span>
-      <span class="rname" title="${esc(name || "（無）")}">${esc(name || "（無）")}</span>
+      <span class="rname" title="${esc(name || "（無）")}">${esc(stripPrefix(name) || "（無）")}</span>
       <span class="bar"><i style="width:${Math.round(cnt / maxc * 100)}%"></i></span>
       <span class="rcount">${cnt}</span>
     </div>`).join("");
@@ -1189,7 +1194,7 @@ async function flSearch() {
     $("#fl-products").innerHTML = prods.length ? prods.map((p, i) => `
       <div class="zrow">
         <span class="rank">${i + 1}</span>
-        <span class="rname" title="${esc(p.productName || "")}">${esc(p.productName || "")}</span>
+        <span class="rname" title="${esc(p.productName || "")}">${esc(stripPrefix(p.productName))}</span>
         <span class="bar"><i style="width:${Math.round((p.number || 0) / pmax * 100)}%"></i></span>
         <span class="rcount">${p.number || 0}</span>
       </div>`).join("")
