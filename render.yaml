@@ -1,0 +1,9 @@
+# Render 一鍵部署設定（https://render.com）
+# 使用方式：Render 後台 → New → Blueprint → 連結此 GitHub repo
+services:
+  - type: web
+    name: studioa-reservation-manager
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/session
+    autoDeploy: true

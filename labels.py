@@ -38,6 +38,10 @@ _FONT_CANDIDATES = [
     (os.path.expanduser("~/Library/Fonts/NotoSansCJK-Regular.ttc"), True, 0),
     ("/Library/Fonts/Arial Unicode MS.ttf", False, 0),
     ("/System/Library/Fonts/Supplemental/Arial Unicode.ttf", False, 0),
+    # Linux（雲端伺服器，需安裝 fonts-noto-cjk 套件）；TC 子字型索引依套件版本而異，逐一嘗試
+    ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", True, 3),
+    ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", True, 2),
+    ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", True, 0),
 ]
 _FONT_BOLD_CANDIDATES = [
     ("/System/Library/Fonts/PingFang.ttc", True, 5),  # Semibold
@@ -46,6 +50,9 @@ _FONT_BOLD_CANDIDATES = [
     ("/System/Library/Fonts/Hiragino Sans GB.ttc", True, 0),
     (os.path.expanduser("~/Library/Fonts/NotoSansCJK-Bold.ttc"), True, 0),
     ("/Library/Fonts/Arial Unicode MS.ttf", False, 0),
+    ("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", True, 3),
+    ("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", True, 2),
+    ("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", True, 0),
 ]
 
 
